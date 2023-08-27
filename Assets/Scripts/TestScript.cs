@@ -2,18 +2,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Unity.VisualScripting;
 using UnityEngine;
 
 public class TestScript : MonoBehaviour
 {
     [DllImport("MultiInputWin32.dll")]
-    public static extern int TestFunc(IntPtr env, ref MouseInputFrame frame);
-    [DllImport("MultiInputWin32.dll")]
-    public static extern int TestFuncRef(IntPtr env, ref MouseInputFrame frame);
-    
-    [DllImport("MultiInputWin32.dll")]
-    public static extern IntPtr TestInitAll(IntPtr env, ulong arg);
+    public static extern int RunInputLoop(IntPtr env);
 
     [DllImport("MultiInputWin32.dll")]
     public static extern IntPtr InitEnvironment(Action<string> format, Action<long> integer, Action<double> floating, Action flush);
@@ -40,16 +36,6 @@ public class TestScript : MonoBehaviour
             );
         }
     }
-    static TestScript()
-    {
-        var env = InitEnv();
-        Debug.Log($"env: {env}");
-        MouseInputFrame input = default;
-        TestFunc(env, ref input);
-        TestFunc(env, ref input);
-        TestFunc(env, ref input);
-    }
-
     [StructLayout(LayoutKind.Sequential)]
     public struct MouseInputFrame
     {
@@ -59,19 +45,14 @@ public class TestScript : MonoBehaviour
 
     public void Start()
     {
+        new Thread(() => 
+        {
+            Debug.Log("Starting new thread for win32 coop");
+
+            var ret = RunInputLoop(NativeDebugManager.Env);
+
+            Debug.Log($"Ending win32 coop thread (ret: {ret})");
+        }).Start();
     }
 
-    static IntPtr _env = IntPtr.Zero;
-    static IntPtr InitEnv()
-    {
-        return NativeDebugManager.Env;
-    }
-
-    public void Update()
-    {
-        var env = InitEnv();
-        MouseInputFrame input = default;
-        var ret = TestFunc(env, ref input);
-        //Debug.Log($"result: {ret}({input.x}:{input.y})");
-    }
 }

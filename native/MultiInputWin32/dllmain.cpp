@@ -3,33 +3,76 @@
 #include<stdlib.h>
 #include<stdio.h>
 
-static int32_t RetVal = 43;
+
+static volatile HMODULE MainHModule;
+
+LRESULT CALLBACK invisible_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	switch (msg)
+	{
+	case WM_CLOSE:
+		DestroyWindow(hwnd);
+		break;
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
+	default:
+		return DefWindowProc(hwnd, msg, wParam, lParam);
+	}
+	return 0;
+}
+
+static BOOL run_invisible_window(environment_t* env, HMODULE hModule) {
+    static const wchar_t INVISIBLE_WINDOW_CLASS_NAME[] = L"RawInputReaderWindow";
+    WNDCLASSEX wc;
+    wc.cbSize = sizeof(WNDCLASSEX);
+    wc.style = 0;
+    wc.lpfnWndProc = invisible_window_proc;
+    wc.cbClsExtra = 0;
+    wc.cbWndExtra = 0;
+    wc.hInstance = hModule;
+    wc.hIcon = LoadIconW(NULL, IDI_APPLICATION);
+    wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.lpszMenuName = NULL;
+    wc.lpszClassName = INVISIBLE_WINDOW_CLASS_NAME;
+    wc.hIconSm = LoadIconW(NULL, IDI_APPLICATION);
+
+    if (!RegisterClassEx(&wc))
+    {
+        DEBUGLOG(env, "Window class registration failed!");
+    }
+    else DEBUGLOG(env, "Window class registered successfully!");
+
+    HWND hwnd = CreateWindowEx(
+        WS_EX_CLIENTEDGE,
+        INVISIBLE_WINDOW_CLASS_NAME,
+        L"The title of my window",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 240, 120,
+        NULL, NULL, hModule, NULL);
+    if (hwnd == NULL)
+    {
+        DEBUGLOG(env, "Window Creation Failed!");
+        return 0;
+    }
+    else DEBUGLOG(env, "Window creation success!");
+    UpdateWindow(hwnd);
+
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0) > 0)
+    {
+        DEBUGLOG(env, "Dispatching a message: {0}", ii(msg.message));
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+    return msg.wParam;
+}
+
+
+
 extern "C" {
-    int DLL_EXPORT TestFunc(environment_t *env, mouse_input_frame_t *to_fill) {
-        to_fill->x = RetVal;
-        to_fill->y = -RetVal - 1;
-        
-        DEBUGLOG(env, "Filling retval with values {0} {1}", ii(to_fill->x), ff(to_fill->y));
-        printf("Trying printf\n");
-        puts("Trying puts\n");
-        fflush(stdout);
-        printf("After flush\n");
-        return RetVal;
-    }
-    int DLL_EXPORT TestFuncRef(environment_t *env, mouse_input_frame_t &to_fill) {
-        to_fill.x = RetVal;
-        to_fill.y = -RetVal - 1;
-        return RetVal;
-    }
-
-    void DLL_EXPORT* TestInitAll(environment_t *env, uint64_t arg) {
-        static mouse_input_frame_t ss;
-        ss.x = arg;
-        return &ss;
-    }
-
-
-    environment_t DLL_EXPORT *InitEnvironment(
+    environment_t  *InitEnvironment(
         decltype(environment_t{}.debug.format) format, decltype(environment_t{}.debug.integer) integer, decltype(environment_t{}.debug.floating) floating, decltype(environment_t{}.debug.flush) flush
     ) {
         environment_t *ret = (environment_t*) malloc(sizeof(environment_t));
@@ -38,36 +81,38 @@ extern "C" {
         ret->debug.integer = integer;
         ret->debug.floating = floating;
         ret->debug.flush = flush;
-        DEBUGLOG(ret, "Input successfully initialized!");
+        DEBUGLOG(ret, "Environment successfully initialized!");
         return ret;
     }
 
-    void DLL_EXPORT DestroyEnvironment(environment_t* env) {if(env) free(env);}
+    void DLL_EXPORT DestroyEnvironment(environment_t* env) { if (env) { DEBUGLOG(env, "Destroying the environment {0}", ii((int64_t)env)); free(env); } }
+
+
+
+    BOOL DLL_EXPORT RunInputLoop(environment_t *env) {
+        auto hModule = MainHModule;
+
+        run_invisible_window(env, hModule);
+
+        return TRUE;
+    }
 }
 
 
 
 
 
-
-
-
-
-BOOL APIENTRY DllMain( HMODULE hModule,
-                       DWORD  ul_reason_for_call,
-                       LPVOID lpReserved
-                     )
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
 {
     switch (ul_reason_for_call)
     {
-    case DLL_PROCESS_ATTACH:
-    case DLL_THREAD_ATTACH:
-    case DLL_THREAD_DETACH:
-    case DLL_PROCESS_DETACH:
+        case DLL_PROCESS_ATTACH:
+        case DLL_THREAD_ATTACH:
+        case DLL_THREAD_DETACH:
+        case DLL_PROCESS_DETACH:
         break;
     }
-
-    RetVal = 444774;
+    MainHModule = hModule;
 
     return TRUE;
 }
