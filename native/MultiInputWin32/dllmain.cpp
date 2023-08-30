@@ -11,7 +11,7 @@ LRESULT CALLBACK invisible_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 	switch (msg)
 	{
 	case WM_CLOSE:
-		DestroyWindow(hwnd);
+        DestroyWindow(hwnd);
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -22,9 +22,17 @@ LRESULT CALLBACK invisible_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 	return 0;
 }
 
-static BOOL run_invisible_window(environment_t* env, HMODULE hModule) {
-    static const wchar_t INVISIBLE_WINDOW_CLASS_NAME[] = L"RawInputReaderWindow";
+static const wchar_t INVISIBLE_WINDOW_CLASS_NAME[] = L"RawInputReaderWindow";
+
+static BOOL register_invisible_window_class(environment_t* env, HMODULE hModule, const wchar_t* window_class_name) {
+
     WNDCLASSEX wc;
+
+    if (GetClassInfoExW(hModule, window_class_name, &wc)) {
+        DEBUGLOG(env, "Window class already registered!");
+        return TRUE;
+    }
+
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.style = 0;
     wc.lpfnWndProc = invisible_window_proc;
@@ -38,15 +46,19 @@ static BOOL run_invisible_window(environment_t* env, HMODULE hModule) {
     wc.lpszClassName = INVISIBLE_WINDOW_CLASS_NAME;
     wc.hIconSm = LoadIconW(NULL, IDI_APPLICATION);
 
-    if (!RegisterClassEx(&wc))
-    {
+    if (!RegisterClassEx(&wc)) {
         DEBUGLOG(env, "Window class registration failed!");
-    }
-    else DEBUGLOG(env, "Window class registered successfully!");
+        return FALSE;
+    } 
+    DEBUGLOG(env, "Window class registered successfully!");
+    return TRUE;
+    
+}
 
+static HWND create_invisible_window(environment_t* env, HMODULE hModule, const wchar_t* window_class_name) {
     HWND hwnd = CreateWindowEx(
         WS_EX_CLIENTEDGE,
-        INVISIBLE_WINDOW_CLASS_NAME,
+        window_class_name,
         L"The title of my window",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, 240, 120,
@@ -54,11 +66,13 @@ static BOOL run_invisible_window(environment_t* env, HMODULE hModule) {
     if (hwnd == NULL)
     {
         DEBUGLOG(env, "Window Creation Failed!");
-        return 0;
+        return NULL;
     }
-    else DEBUGLOG(env, "Window creation success!");
+    DEBUGLOG(env, "Successfully created window {0}", ii((intptr_t)hwnd));
     UpdateWindow(hwnd);
-
+    return hwnd;
+}
+static BOOL run_infinite_message_loop(environment_t* env) {
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0) > 0)
     {
@@ -67,6 +81,11 @@ static BOOL run_invisible_window(environment_t* env, HMODULE hModule) {
         DispatchMessage(&msg);
     }
     return msg.wParam;
+}
+
+static BOOL stop_window(environment_t* env, HWND window) {
+    DEBUGLOG(env, "Posting the WM_CLOSE message to {0}", ii((intptr_t)window));
+    return SendMessageW(window, WM_CLOSE, 0, 0);
 }
 
 
@@ -88,13 +107,18 @@ extern "C" {
     void DLL_EXPORT DestroyEnvironment(environment_t* env) { if (env) { DEBUGLOG(env, "Destroying the environment {0}", ii((int64_t)env)); free(env); } }
 
 
+    BOOL DLL_EXPORT RegisterInputHandle(environment_t* env) {
+        return register_invisible_window_class(env, MainHModule, INVISIBLE_WINDOW_CLASS_NAME);
 
-    BOOL DLL_EXPORT RunInputLoop(environment_t *env) {
-        auto hModule = MainHModule;
-
-        run_invisible_window(env, hModule);
-
-        return TRUE;
+    }
+    input_reader_handle_t DLL_EXPORT CreateInputHandle(environment_t* env) {
+        return create_invisible_window(env, MainHModule, INVISIBLE_WINDOW_CLASS_NAME);
+    }
+    BOOL DLL_EXPORT RunInputInfiniteLoop(environment_t* env, input_reader_handle_t hwnd) {
+        return run_infinite_message_loop(env);
+    }
+    BOOL DLL_EXPORT StopInputInfiniteLoop(environment_t* env, input_reader_handle_t hwnd) {
+        return stop_window(env, hwnd);
     }
 }
 

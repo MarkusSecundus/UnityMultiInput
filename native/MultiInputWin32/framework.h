@@ -20,6 +20,8 @@ typedef struct {
 	} debug;
 } environment_t;
 
+typedef HWND input_reader_handle_t;
+
 
 #define DEBUGLOG(env, fformat, ...) {\
 	if(env){\
@@ -34,8 +36,14 @@ typedef struct {
 #define DLL_EXPORT __declspec(dllexport)
 
 extern "C" {
-	BOOL DLL_EXPORT RunInputLoop(environment_t* env);
+	
+	BOOL DLL_EXPORT RegisterInputHandle(environment_t* env);
+	input_reader_handle_t DLL_EXPORT CreateInputHandle(environment_t* env);
+	BOOL DLL_EXPORT RunInputInfiniteLoop(environment_t* env, input_reader_handle_t);
+	BOOL DLL_EXPORT StopInputInfiniteLoop(environment_t* env, input_reader_handle_t);
 
 	environment_t DLL_EXPORT *InitEnvironment(decltype(environment_t{}.debug.format),decltype(environment_t{}.debug.integer),decltype(environment_t{}.debug.floating),decltype(environment_t{}.debug.flush) );
 	void DLL_EXPORT DestroyEnvironment(environment_t* env);
+
+
 }
