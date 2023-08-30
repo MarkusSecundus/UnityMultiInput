@@ -15,7 +15,10 @@ typedef struct {
 	struct {
 		void (*format)(const char*);
 		void (*integer)(int64_t);
+		void (*pointer)(void*);
 		void (*floating)(double);
+		void (*cstring)(const char*);
+		void (*wstring)(const wchar_t*);
 		void (*flush)(void);
 	} debug;
 } environment_t;
@@ -28,6 +31,9 @@ typedef HWND input_reader_handle_t;
 		env->debug.format(fformat);\
 		auto ii = env->debug.integer;\
 		auto ff = env->debug.floating;\
+		auto pp = env->debug.pointer;\
+		auto ss = env->debug.cstring;\
+		auto wss = env->debug.wstring;\
 		__VA_ARGS__;\
 		env->debug.flush();\
 	}\
@@ -42,7 +48,14 @@ extern "C" {
 	BOOL DLL_EXPORT RunInputInfiniteLoop(environment_t* env, input_reader_handle_t);
 	BOOL DLL_EXPORT StopInputInfiniteLoop(environment_t* env, input_reader_handle_t);
 
-	environment_t DLL_EXPORT *InitEnvironment(decltype(environment_t{}.debug.format),decltype(environment_t{}.debug.integer),decltype(environment_t{}.debug.floating),decltype(environment_t{}.debug.flush) );
+	environment_t DLL_EXPORT *InitEnvironment(
+		decltype(environment_t{}.debug.format),
+		decltype(environment_t{}.debug.integer),
+		decltype(environment_t{}.debug.pointer),
+		decltype(environment_t{}.debug.floating),
+		decltype(environment_t{}.debug.cstring),
+		decltype(environment_t{}.debug.wstring),
+		decltype(environment_t{}.debug.flush) );
 	void DLL_EXPORT DestroyEnvironment(environment_t* env);
 
 

@@ -29,7 +29,7 @@ static BOOL register_invisible_window_class(environment_t* env, HMODULE hModule,
     WNDCLASSEX wc;
 
     if (GetClassInfoExW(hModule, window_class_name, &wc)) {
-        DEBUGLOG(env, "Window class already registered!");
+        DEBUGLOG(env, "Window class '{0}' already registered!", wss(window_class_name));
         return TRUE;
     }
 
@@ -47,10 +47,10 @@ static BOOL register_invisible_window_class(environment_t* env, HMODULE hModule,
     wc.hIconSm = LoadIconW(NULL, IDI_APPLICATION);
 
     if (!RegisterClassEx(&wc)) {
-        DEBUGLOG(env, "Window class registration failed!");
+        DEBUGLOG(env, "Window class ({0}) registration failed!", wss(window_class_name));
         return FALSE;
     } 
-    DEBUGLOG(env, "Window class registered successfully!");
+    DEBUGLOG(env, "Window class '{0}' registered successfully!", wss(window_class_name));
     return TRUE;
     
 }
@@ -68,7 +68,7 @@ static HWND create_invisible_window(environment_t* env, HMODULE hModule, const w
         DEBUGLOG(env, "Window Creation Failed!");
         return NULL;
     }
-    DEBUGLOG(env, "Successfully created window {0}", ii((intptr_t)hwnd));
+    DEBUGLOG(env, "Successfully created window {0}", pp(hwnd));
     UpdateWindow(hwnd);
     return hwnd;
 }
@@ -84,7 +84,7 @@ static BOOL run_infinite_message_loop(environment_t* env) {
 }
 
 static BOOL stop_window(environment_t* env, HWND window) {
-    DEBUGLOG(env, "Posting the WM_CLOSE message to {0}", ii((intptr_t)window));
+    DEBUGLOG(env, "Posting the WM_CLOSE message to {0}", pp(window));
     return SendMessageW(window, WM_CLOSE, 0, 0);
 }
 
@@ -92,15 +92,25 @@ static BOOL stop_window(environment_t* env, HWND window) {
 
 extern "C" {
     environment_t  *InitEnvironment(
-        decltype(environment_t{}.debug.format) format, decltype(environment_t{}.debug.integer) integer, decltype(environment_t{}.debug.floating) floating, decltype(environment_t{}.debug.flush) flush
+        decltype(environment_t{}.debug.format) format,
+        decltype(environment_t{}.debug.integer) integer,
+        decltype(environment_t{}.debug.pointer) pointer,
+        decltype(environment_t{}.debug.floating) floating,
+        decltype(environment_t{}.debug.cstring) cstring,
+        decltype(environment_t{}.debug.wstring) wstring,
+        decltype(environment_t{}.debug.flush) flush
     ) {
         environment_t *ret = (environment_t*) malloc(sizeof(environment_t));
         if (!ret) return NULL;
         ret->debug.format = format;
         ret->debug.integer = integer;
+        ret->debug.pointer = pointer;
         ret->debug.floating = floating;
+        ret->debug.cstring = cstring;
+        ret->debug.wstring = wstring;
         ret->debug.flush = flush;
-        DEBUGLOG(ret, "Environment successfully initialized!");
+        DEBUGLOG(ret, "Environment {0} successfully initialized!", pp(ret));
+
         return ret;
     }
 
