@@ -3,13 +3,28 @@
 #include<stdlib.h>
 #include<stdio.h>
 
+#include "macro_utils.h"
 
 static volatile HMODULE MainHModule;
+
+static environment_t* DebugEnv;
+
+void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) {
+    DEBUGLOG(DebugEnv, "Reading raw input {1}(handle: {2}) for window {0}", pp(hwnd), ii(inputCode), pp(inputHandle));
+}
 
 LRESULT CALLBACK invisible_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	switch (msg)
 	{
+    case WM_INPUT:
+    {
+        auto inputCode = GET_RAWINPUT_CODE_WPARAM(wParam);
+        handle_raw_input_message(hwnd, inputCode, (HRAWINPUT)lParam);
+        if(inputCode == RIM_INPUT)
+            goto default_label;
+    }
+        break;
 	case WM_CLOSE:
         DestroyWindow(hwnd);
 		break;
@@ -17,6 +32,7 @@ LRESULT CALLBACK invisible_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 		PostQuitMessage(0);
 		break;
 	default:
+    default_label:
 		return DefWindowProc(hwnd, msg, wParam, lParam);
 	}
 	return 0;
@@ -89,6 +105,34 @@ static BOOL stop_window(environment_t* env, HWND window) {
 }
 
 
+static BOOL register_for_raw_input(environment_t* env, HMODULE hModule, HWND window) {
+#if 1
+    RAWINPUTDEVICE deviceDefinitions[2];
+
+    deviceDefinitions[0].dwFlags = 0;
+    deviceDefinitions[0].usUsagePage = 0x0001;
+    deviceDefinitions[0].usUsage = 0x0001;
+    deviceDefinitions[0].hwndTarget = window;
+
+    deviceDefinitions[1].dwFlags = 0;
+    deviceDefinitions[1].usUsagePage = 0x0001;
+    deviceDefinitions[1].usUsage = 0x0002;
+    deviceDefinitions[1].hwndTarget = window;
+#else
+    RAWINPUTDEVICE deviceDefinitions[1];
+
+    deviceDefinitions[0].dwFlags = RIDEV_PAGEONLY;// | RIDEV_EXINPUTSINK;
+    deviceDefinitions[0].usUsagePage = 0x0001;
+    deviceDefinitions[0].usUsage = 0;
+    deviceDefinitions[0].hwndTarget = window;
+
+#endif
+
+    if (!RegisterRawInputDevices(deviceDefinitions, ARRAY_LENGTH(deviceDefinitions), sizeof(RAWINPUTDEVICE))) return FALSE;
+
+    return TRUE;
+}
+
 
 extern "C" {
     environment_t  *InitEnvironment(
@@ -110,19 +154,26 @@ extern "C" {
         ret->debug.wstring = wstring;
         ret->debug.flush = flush;
         DEBUGLOG(ret, "Environment {0} successfully initialized!", pp(ret));
+        DebugEnv = ret;
 
         return ret;
     }
 
-    void DLL_EXPORT DestroyEnvironment(environment_t* env) { if (env) { DEBUGLOG(env, "Destroying the environment {0}", ii((int64_t)env)); free(env); } }
+    void DLL_EXPORT DestroyEnvironment(environment_t* env) { if (env) { DEBUGLOG(env, "Destroying the environment {0}", ii((int64_t)env)); free(env); DebugEnv = NULL; } }
 
 
     BOOL DLL_EXPORT RegisterInputHandle(environment_t* env) {
-        return register_invisible_window_class(env, MainHModule, INVISIBLE_WINDOW_CLASS_NAME);
-
+        return TRUE;
     }
     input_reader_handle_t DLL_EXPORT CreateInputHandle(environment_t* env) {
-        return create_invisible_window(env, MainHModule, INVISIBLE_WINDOW_CLASS_NAME);
+        HMODULE hModule = MainHModule;
+        if(!register_invisible_window_class(env, hModule, INVISIBLE_WINDOW_CLASS_NAME))
+            return NULL;
+        auto ret = create_invisible_window(env, hModule, INVISIBLE_WINDOW_CLASS_NAME);
+        if (!ret) return NULL;
+        if (!register_for_raw_input(env, hModule, ret))
+            DEBUGLOG(env, "Registration for raw input failed!");
+        return ret;
     }
     BOOL DLL_EXPORT RunInputInfiniteLoop(environment_t* env, input_reader_handle_t hwnd) {
         return run_infinite_message_loop(env);
