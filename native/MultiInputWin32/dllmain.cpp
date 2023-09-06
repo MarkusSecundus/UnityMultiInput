@@ -2,15 +2,65 @@
 #include "pch.h"
 #include<stdlib.h>
 #include<stdio.h>
+#include<memory>
 
 #include "macro_utils.h"
 
 static volatile HMODULE MainHModule;
 
-static environment_t* DebugEnv;
+static volatile environment_t* DebugEnv;
+
+
 
 void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) {
-    DEBUGLOG(DebugEnv, "Reading raw input {1}(handle: {2}) for window {0}", pp(hwnd), ii(inputCode), pp(inputHandle));
+    auto env = DebugEnv;
+    DEBUGLOG(env, "Reading raw input {1}(handle: {2}) for window {0}", pp(hwnd), ii(inputCode), pp(inputHandle));
+
+    UINT dwSize = 0; 
+    GetRawInputData(inputHandle, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
+    LPBYTE lpb = new BYTE[dwSize];
+
+    if (lpb == NULL)
+    {
+        DEBUGLOG(env, "Allocation failed while handling raw input!\n");
+        return;
+    }
+
+    if (GetRawInputData(inputHandle, RID_INPUT, lpb, &dwSize, sizeof(RAWINPUTHEADER)) != dwSize) {
+        DEBUGLOG(env, "GetRawInputData does not return correct size !\n");
+    }
+
+    RAWINPUT* raw = (RAWINPUT*)lpb;
+
+    if (raw->header.dwType == RIM_TYPEKEYBOARD)
+    {
+        DEBUGLOG(env, " Kbd({6}): make={0} Flags:{1} Reserved:{2} ExtraInformation:{3}, msg={4} VK={5} \n",
+            ii(raw->data.keyboard.MakeCode),
+            ii(raw->data.keyboard.Flags),
+            ii(raw->data.keyboard.Reserved),
+            ii(raw->data.keyboard.ExtraInformation),
+            ii(raw->data.keyboard.Message),
+            ii(raw->data.keyboard.VKey),
+            pp(raw->header.hDevice)
+        );
+
+    }
+    else if (raw->header.dwType == RIM_TYPEMOUSE)
+    {
+        DEBUGLOG(env, "Mouse({8}): usFlags={0} ulButtons={1} usButtonFlags={2} usButtonData={3} ulRawButtons={4} lLastX={5} lLastY={6} ulExtraInformation={7}\r\n",
+            ii(raw->data.mouse.usFlags),
+            ii(raw->data.mouse.ulButtons),
+            ii(raw->data.mouse.usButtonFlags),
+            ii(raw->data.mouse.usButtonData),
+            ii(raw->data.mouse.ulRawButtons),
+            ii(raw->data.mouse.lLastX),
+            ii(raw->data.mouse.lLastY),
+            ii(raw->data.mouse.ulExtraInformation),
+            pp(raw->header.hDevice)
+        );
+    }
+
+    delete[] lpb;
 }
 
 LRESULT CALLBACK invisible_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
