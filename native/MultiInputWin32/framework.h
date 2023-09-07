@@ -3,15 +3,18 @@
 #define WIN32_LEAN_AND_MEAN 
 #include <windows.h>
 #include <stdint.h>
-
-#define ACTION1(T, name) void (*name)(T) 
+ 
 
 typedef struct {
 	int32_t x;
 	int32_t y;
 } mouse_input_frame_t;
 
-typedef struct {
+class input_tracker_t;
+
+
+
+struct environment_t{
 	struct {
 		void (*format)(const char*);
 		void (*integer)(int64_t);
@@ -21,7 +24,8 @@ typedef struct {
 		void (*wstring)(const wchar_t*);
 		void (*flush)(void);
 	} debug;
-} environment_t;
+	input_tracker_t* input_tracker;
+};
 
 typedef HWND input_reader_handle_t;
 

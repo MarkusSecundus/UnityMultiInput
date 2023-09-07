@@ -3,6 +3,8 @@
 #include<stdlib.h>
 #include<stdio.h>
 #include<memory>
+#include<unordered_map>
+#include<mutex>
 
 #include "macro_utils.h"
 
@@ -10,11 +12,53 @@ static volatile HMODULE MainHModule;
 
 static volatile environment_t* DebugEnv;
 
+using MouseHandle = HANDLE;
+
+struct mutex_lock {
+    mutex_lock(std::mutex *mutex) :m(mutex) { m->lock(); }
+    ~mutex_lock() { m->unlock(); }
+private:
+    std::mutex *m;
+};
+
+
+
+struct mouse_state_t {
+public:
+    int32_t x = 0, y = 0;
+    int32_t main_scroll = 0, horizontal_scroll = 0;
+    uint32_t button_flags = 0;
+};
+
+
+class input_tracker_t {
+public:
+    mouse_state_t* find_mouse(MouseHandle h) {
+        return &(mice[h]);
+        //auto ret = mice.find(h);
+        //if (ret == mice.end())
+        //    return &(mice[h] = mouse_state_t());
+        //return &(ret->second);
+    }
+    mutex_lock lock() { return mutex_lock(&mut); }
+
+private:
+
+
+    std::mutex mut;
+
+    std::unordered_map<MouseHandle, mouse_state_t> mice;
+};
+
+volatile input_tracker_t* InputTracker;
+
 
 
 void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) {
-    auto env = DebugEnv;
-    DEBUGLOG(env, "Reading raw input {1}(handle: {2}) for window {0}", pp(hwnd), ii(inputCode), pp(inputHandle));
+    auto env = (environment_t*)GetWindowLongPtrW(hwnd, 0);
+    auto tracker = env->input_tracker;
+
+    //DEBUGLOG(env, "Reading raw input {1}(handle: {2}) for window {0}", pp(hwnd), ii(inputCode), pp(inputHandle));
 
     UINT dwSize = 0; 
     GetRawInputData(inputHandle, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
@@ -47,7 +91,8 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
     }
     else if (raw->header.dwType == RIM_TYPEMOUSE)
     {
-        DEBUGLOG(env, "Mouse({8}): usFlags={0} ulButtons={1} usButtonFlags={2} usButtonData={3} ulRawButtons={4} lLastX={5} lLastY={6} ulExtraInformation={7}\r\n",
+        const auto& rm(raw->data.mouse);
+        DEBUGLOG(((environment_t*)NULL), "Mouse({8}): usFlags={0} ulButtons={1} usButtonFlags={2} usButtonData={3} ulRawButtons={4} lLastX={5} lLastY={6} ulExtraInformation={7}\r\n",
             ii(raw->data.mouse.usFlags),
             ii(raw->data.mouse.ulButtons),
             ii(raw->data.mouse.usButtonFlags),
@@ -58,6 +103,27 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
             ii(raw->data.mouse.ulExtraInformation),
             pp(raw->header.hDevice)
         );
+
+        {   auto _ = tracker->lock();
+
+            auto m = tracker->find_mouse(hwnd);
+            if (rm.usFlags | MOUSE_MOVE_ABSOLUTE)
+            {
+                m->x = rm.lLastX;
+                m->y = rm.lLastY;
+            }
+            else {
+                m->x += rm.lLastX;
+                m->y += rm.lLastY;
+            }
+            if (rm.usButtonFlags | RI_MOUSE_WHEEL) {
+                m->main_scroll += rm.usButtonData;
+            }
+            if (rm.usButtonFlags | RI_MOUSE_HWHEEL) {
+                m->horizontal_scroll += rm.usButtonData;
+            }
+            m->button_flags |= rm.usButtonFlags;
+        }
     }
 
     delete[] lpb;
@@ -103,7 +169,7 @@ static BOOL register_invisible_window_class(environment_t* env, HMODULE hModule,
     wc.style = 0;
     wc.lpfnWndProc = invisible_window_proc;
     wc.cbClsExtra = 0;
-    wc.cbWndExtra = 0;
+    wc.cbWndExtra = sizeof(LONG_PTR);
     wc.hInstance = hModule;
     wc.hIcon = LoadIconW(NULL, IDI_APPLICATION);
     wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
@@ -134,6 +200,7 @@ static HWND create_invisible_window(environment_t* env, HMODULE hModule, const w
         DEBUGLOG(env, "Window Creation Failed!");
         return NULL;
     }
+    SetWindowLongPtrW(hwnd, 0, (LONG_PTR)env);
     DEBUGLOG(env, "Successfully created window {0}", pp(hwnd));
     UpdateWindow(hwnd);
     return hwnd;
@@ -142,7 +209,7 @@ static BOOL run_infinite_message_loop(environment_t* env) {
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0) > 0)
     {
-        DEBUGLOG(env, "Dispatching a message: {0}", ii(msg.message));
+        //DEBUGLOG(env, "Dispatching a message: {0}", ii(msg.message));
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
@@ -194,7 +261,7 @@ extern "C" {
         decltype(environment_t{}.debug.wstring) wstring,
         decltype(environment_t{}.debug.flush) flush
     ) {
-        environment_t *ret = (environment_t*) malloc(sizeof(environment_t));
+        environment_t *ret = new environment_t();
         if (!ret) return NULL;
         ret->debug.format = format;
         ret->debug.integer = integer;
@@ -203,13 +270,21 @@ extern "C" {
         ret->debug.cstring = cstring;
         ret->debug.wstring = wstring;
         ret->debug.flush = flush;
+        
+        ret->input_tracker = new input_tracker_t();
+
         DEBUGLOG(ret, "Environment {0} successfully initialized!", pp(ret));
         DebugEnv = ret;
 
         return ret;
     }
 
-    void DLL_EXPORT DestroyEnvironment(environment_t* env) { if (env) { DEBUGLOG(env, "Destroying the environment {0}", ii((int64_t)env)); free(env); DebugEnv = NULL; } }
+    void DLL_EXPORT DestroyEnvironment(environment_t* env) { if (env) {
+        DEBUGLOG(env, "Destroying the environment {0}", ii((int64_t)env)); 
+        delete env->input_tracker;
+        delete env; 
+        DebugEnv = NULL; 
+    } }
 
 
     BOOL DLL_EXPORT RegisterInputHandle(environment_t* env) {
