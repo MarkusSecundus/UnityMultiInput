@@ -3,12 +3,22 @@
 #define WIN32_LEAN_AND_MEAN 
 #include <windows.h>
 #include <stdint.h>
- 
 
-typedef struct {
-	int32_t x;
-	int32_t y;
-} mouse_input_frame_t;
+
+struct native_array_t {
+	native_array_t(char* begin_, int64_t length_):begin(begin_), length(length_){}
+	char* begin;
+	int32_t length;
+};
+
+using MouseHandle = HANDLE;
+struct mouse_state_t {
+public:
+	int32_t x = 0, y = 0;
+	int32_t main_scroll = 0, horizontal_scroll = 0;
+	uint32_t button_flags = 0;
+};
+
 
 class input_tracker_t;
 
@@ -63,4 +73,10 @@ extern "C" {
 	void DLL_EXPORT DestroyEnvironment(environment_t* env);
 
 
+	BOOL DLL_EXPORT ReadMouseState(environment_t* env, MouseHandle mouse, mouse_state_t* out);
+
+	native_array_t DLL_EXPORT GetAvailableDevicesOfType(environment_t* env, int deviceType);
+	native_array_t DLL_EXPORT GetActiveDevicesOfType(environment_t* env, int deviceType);
+
+	void DLL_EXPORT NativeFree(char* toFree);
 }

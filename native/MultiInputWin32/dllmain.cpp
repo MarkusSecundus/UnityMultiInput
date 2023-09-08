@@ -5,14 +5,14 @@
 #include<memory>
 #include<unordered_map>
 #include<mutex>
+#include<vector>
+#include<optional>
 
 #include "macro_utils.h"
 
 static volatile HMODULE MainHModule;
 
-static volatile environment_t* DebugEnv;
 
-using MouseHandle = HANDLE;
 
 struct mutex_lock {
     mutex_lock(std::mutex *mutex) :m(mutex) { m->lock(); }
@@ -23,28 +23,23 @@ private:
 
 
 
-struct mouse_state_t {
-public:
-    int32_t x = 0, y = 0;
-    int32_t main_scroll = 0, horizontal_scroll = 0;
-    uint32_t button_flags = 0;
-};
-
 
 class input_tracker_t {
 public:
     mouse_state_t* find_mouse(MouseHandle h) {
         return &(mice[h]);
-        //auto ret = mice.find(h);
-        //if (ret == mice.end())
-        //    return &(mice[h] = mouse_state_t());
-        //return &(ret->second);
     }
     mutex_lock lock() { return mutex_lock(&mut); }
 
+    std::vector<MouseHandle> get_active_mice() {
+        std::vector<MouseHandle> ret;
+        for (const auto& m : mice) {
+            ret.emplace_back(m.first);
+        }
+        return ret;
+    }
+
 private:
-
-
     std::mutex mut;
 
     std::unordered_map<MouseHandle, mouse_state_t> mice;
@@ -52,6 +47,21 @@ private:
 
 volatile input_tracker_t* InputTracker;
 
+template<typename T>
+native_array_t to_native_array(std::vector<T>&& vec) {
+    T* ret = (T*)malloc(vec.size()*sizeof(T));
+    if (!ret) 
+        return native_array_t(NULL, -1);
+    
+    size_t pos = 0;
+    for (auto it = vec.begin(); it != vec.end();)
+        ret[pos++] = *(it++);
+
+    return native_array_t((char*)(void*)ret, vec.size());
+}
+void native_array_free(char* ptr) {
+    free(ptr);
+}
 
 
 void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) {
@@ -62,19 +72,18 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
 
     UINT dwSize = 0; 
     GetRawInputData(inputHandle, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
-    LPBYTE lpb = new BYTE[dwSize];
-
-    if (lpb == NULL)
+    auto lpb = std::make_unique<BYTE[]>(dwSize);
+    if (!lpb)
     {
         DEBUGLOG(env, "Allocation failed while handling raw input!\n");
         return;
     }
 
-    if (GetRawInputData(inputHandle, RID_INPUT, lpb, &dwSize, sizeof(RAWINPUTHEADER)) != dwSize) {
+    if (GetRawInputData(inputHandle, RID_INPUT, lpb.get(), &dwSize, sizeof(RAWINPUTHEADER)) != dwSize) {
         DEBUGLOG(env, "GetRawInputData does not return correct size !\n");
     }
 
-    RAWINPUT* raw = (RAWINPUT*)lpb;
+    RAWINPUT* raw = (RAWINPUT*)(lpb.get());
 
     if (raw->header.dwType == RIM_TYPEKEYBOARD)
     {
@@ -92,7 +101,7 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
     else if (raw->header.dwType == RIM_TYPEMOUSE)
     {
         const auto& rm(raw->data.mouse);
-        DEBUGLOG(((environment_t*)NULL), "Mouse({8}): usFlags={0} ulButtons={1} usButtonFlags={2} usButtonData={3} ulRawButtons={4} lLastX={5} lLastY={6} ulExtraInformation={7}\r\n",
+        DEBUGLOG(env, "Mouse({8}): usFlags={0} ulButtons={1} usButtonFlags={2} usButtonData={3} ulRawButtons={4} lLastX={5} lLastY={6} ulExtraInformation={7}\r\n",
             ii(raw->data.mouse.usFlags),
             ii(raw->data.mouse.ulButtons),
             ii(raw->data.mouse.usButtonFlags),
@@ -106,9 +115,10 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
 
         {   auto _ = tracker->lock();
 
-            auto m = tracker->find_mouse(hwnd);
+            auto m = tracker->find_mouse(raw->header.hDevice);
             if (rm.usFlags | MOUSE_MOVE_ABSOLUTE)
             {
+                DEBUGLOG(env, "Moving the mouse {0} in ABSOLUTE!", pp(raw->header.hDevice));
                 m->x = rm.lLastX;
                 m->y = rm.lLastY;
             }
@@ -117,16 +127,14 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
                 m->y += rm.lLastY;
             }
             if (rm.usButtonFlags | RI_MOUSE_WHEEL) {
-                m->main_scroll += rm.usButtonData;
+                m->main_scroll += (SHORT)rm.usButtonData;
             }
             if (rm.usButtonFlags | RI_MOUSE_HWHEEL) {
-                m->horizontal_scroll += rm.usButtonData;
+                m->horizontal_scroll += (SHORT)rm.usButtonData;
             }
             m->button_flags |= rm.usButtonFlags;
         }
     }
-
-    delete[] lpb;
 }
 
 LRESULT CALLBACK invisible_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -251,6 +259,24 @@ static BOOL register_for_raw_input(environment_t* env, HMODULE hModule, HWND win
 }
 
 
+/// <param name="rimType">Can be either RIM_TYPEMOUSE, RIM_TYPEKEYBOARD, RIM_TYPEHID</param>
+static std::vector<HANDLE> list_all_raw_input_devices_of_type(environment_t* env, int rimType) {
+    UINT numDevices = 0;
+    if (GetRawInputDeviceList(NULL, &numDevices, sizeof(RAWINPUTDEVICELIST)) == -1) return std::vector<HANDLE>{};
+
+    auto devices = std::make_unique<RAWINPUTDEVICELIST[]>(numDevices);
+    if(GetRawInputDeviceList(devices.get(), &numDevices, sizeof(RAWINPUTDEVICELIST)) == -1) return std::vector<HANDLE>{};
+
+    std::vector<MouseHandle> ret;
+    for (int t = 0; t < numDevices; ++t) {
+        if (devices[t].dwType == rimType)
+            ret.emplace_back(devices[t].hDevice);
+    }
+    
+    return ret;
+}
+
+
 extern "C" {
     environment_t  *InitEnvironment(
         decltype(environment_t{}.debug.format) format,
@@ -274,7 +300,6 @@ extern "C" {
         ret->input_tracker = new input_tracker_t();
 
         DEBUGLOG(ret, "Environment {0} successfully initialized!", pp(ret));
-        DebugEnv = ret;
 
         return ret;
     }
@@ -283,7 +308,6 @@ extern "C" {
         DEBUGLOG(env, "Destroying the environment {0}", ii((int64_t)env)); 
         delete env->input_tracker;
         delete env; 
-        DebugEnv = NULL; 
     } }
 
 
@@ -306,6 +330,29 @@ extern "C" {
     BOOL DLL_EXPORT StopInputInfiniteLoop(environment_t* env, input_reader_handle_t hwnd) {
         return stop_window(env, hwnd);
     }
+
+
+    BOOL DLL_EXPORT ReadMouseState(environment_t* env, MouseHandle mouse, mouse_state_t* out) {
+        auto tracker = env->input_tracker;
+        auto _ = tracker->lock();
+
+        auto state = tracker->find_mouse(mouse);
+        *out = *state;
+        state->button_flags = 0;
+        return TRUE;
+    }
+
+    native_array_t DLL_EXPORT GetAvailableDevicesOfType(environment_t* env, int deviceType) {
+        return to_native_array(list_all_raw_input_devices_of_type(env, deviceType));
+    }
+    native_array_t DLL_EXPORT GetActiveDevicesOfType(environment_t* env, int deviceType) {
+        if (deviceType == RIM_TYPEMOUSE)
+            return to_native_array(env->input_tracker->get_active_mice());
+        else
+            return native_array_t(nullptr, 0);
+    }
+
+    void DLL_EXPORT NativeFree(char* toFree) { native_array_free(toFree); }
 }
 
 
