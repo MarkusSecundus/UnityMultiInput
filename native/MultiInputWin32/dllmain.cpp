@@ -116,9 +116,9 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
         {   auto _ = tracker->lock();
 
             auto m = tracker->find_mouse(raw->header.hDevice);
-            if (rm.usFlags | MOUSE_MOVE_ABSOLUTE)
+
+            if (rm.usFlags & MOUSE_MOVE_ABSOLUTE)
             {
-                DEBUGLOG(env, "Moving the mouse {0} in ABSOLUTE!", pp(raw->header.hDevice));
                 m->x = rm.lLastX;
                 m->y = rm.lLastY;
             }
@@ -126,10 +126,11 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
                 m->x += rm.lLastX;
                 m->y += rm.lLastY;
             }
-            if (rm.usButtonFlags | RI_MOUSE_WHEEL) {
+
+            if (rm.usButtonFlags & RI_MOUSE_WHEEL) {
                 m->main_scroll += (SHORT)rm.usButtonData;
             }
-            if (rm.usButtonFlags | RI_MOUSE_HWHEEL) {
+            if (rm.usButtonFlags & RI_MOUSE_HWHEEL) {
                 m->horizontal_scroll += (SHORT)rm.usButtonData;
             }
             m->button_flags |= rm.usButtonFlags;
