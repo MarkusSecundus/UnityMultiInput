@@ -138,6 +138,12 @@
       <EnableUAC>false</EnableUAC>
     </Link>
   </ItemDefinitionGroup>
+  <!--<ItemDefinitionGroup>
+	 <PostBuildEvent>
+		<Command> copy $(ProjectDir)$(Configuration)\$(TargetFileName) $(ProjectDir)\..\..\Assets\Scripts\dlls\$(TargetFileName)</Command>
+		<Message>Copying the final dll to the main project's Assets folder</Message>
+	 </PostBuildEvent>
+  </ItemDefinitionGroup>-->
   <ItemGroup>
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />
