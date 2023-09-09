@@ -13,6 +13,7 @@ using TMPro;
 
 using MouseHandle = System.IntPtr;
 using EnvHandle = System.IntPtr;
+using InputHandle = System.IntPtr;
 
 public enum RIM_DEVICETYPE : int
 {
@@ -23,31 +24,29 @@ public class TestScript : MonoBehaviour
 {
 
     [DllImport("MultiInputWin32.dll")]
-    public static extern int RegisterInputHandle(EnvHandle env);
+    public static extern InputHandle InitInputHandle();
     [DllImport("MultiInputWin32.dll")]
-    public static extern IntPtr CreateInputHandle(EnvHandle env);
+    public static extern int RunInputInfiniteLoop(InputHandle input);
     [DllImport("MultiInputWin32.dll")]
-    public static extern int RunInputInfiniteLoop(EnvHandle env, MouseHandle inputReaderHandle);
-    [DllImport("MultiInputWin32.dll")]
-    public static extern int StopInputInfiniteLoop(EnvHandle env, MouseHandle inputReaderHandle);
+    public static extern int StopInputInfiniteLoop(InputHandle input);
 
 
 
     [DllImport("MultiInputWin32.dll")]
-    public static extern EnvHandle InitEnvironment(NativeAction<string> format, NativeAction<long> integer, NativeAction<IntPtr> pointer, NativeAction<double> floating, NativeAction<string> cstring, NativeWstringAction wstring, NativeAction flush);
+    public static extern EnvHandle InitDebug(NativeAction<string> format, NativeAction<long> integer, NativeAction<IntPtr> pointer, NativeAction<double> floating, NativeAction<string> cstring, NativeWstringAction wstring, NativeAction flush);
     [DllImport("MultiInputWin32.dll")]
-    public static extern void DestroyEnvironment(EnvHandle env);
+    public static extern void DestroyDebug();
 
 
     
     [DllImport("MultiInputWin32.dll")]
-    public static extern int ReadMouseState(EnvHandle env, MouseHandle mouseHandle, out MouseInputFrame ret);
+    public static extern int ReadMouseState(InputHandle tracker, MouseHandle mouseHandle, out MouseInputFrame ret);
 
     
     [DllImport("MultiInputWin32.dll")]
-    public static extern NativeArray<MouseHandle> GetAvailableDevicesOfType(EnvHandle env, RIM_DEVICETYPE deviceType);
+    public static extern NativeArray<MouseHandle> GetAvailableDevicesOfType(InputHandle tracker, RIM_DEVICETYPE deviceType);
     [DllImport("MultiInputWin32.dll")]
-    public static extern NativeArray<MouseHandle> GetActiveDevicesOfType(EnvHandle env, RIM_DEVICETYPE deviceType);
+    public static extern NativeArray<MouseHandle> GetActiveDevicesOfType(InputHandle tracker, RIM_DEVICETYPE deviceType);
 
 
     public TMP_Text debugPrototype;
@@ -68,10 +67,9 @@ public class TestScript : MonoBehaviour
         NativeAction flush, silentFlush;
         string formatString = "";
         List<object> args = new List<object>();
-        public readonly IntPtr Env;
         public NativeDebugManager()
         {
-            Env = InitEnvironment(
+            InitDebug(
                  format = s => formatString = s,
                  integer = i => args.Add(i),
                  pointer = p => args.Add(p),
@@ -97,7 +95,7 @@ public class TestScript : MonoBehaviour
             );
         }
 
-        public void Dispose() => DestroyEnvironment(Env);
+        public void Dispose() => DestroyDebug();
     }
     [StructLayout(LayoutKind.Sequential)]
     public struct MouseInputFrame
@@ -136,13 +134,15 @@ public class TestScript : MonoBehaviour
             dbg = new();
             Debug.Log("Starting new thread for win32 coop");
 
-            if (RegisterInputHandle(dbg.Env) != 1) return;
-            var inputReaderHandle = this.inputReaderHandle = CreateInputHandle(dbg.Env);
+            var inputReaderHandle = this.inputReaderHandle = InitInputHandle();
+            if (inputReaderHandle == IntPtr.Zero) return;
             Debug.Log($"Created input window({inputReaderHandle})");
 
             dbg.IsSilent = true;
-            var ret = RunInputInfiniteLoop(dbg.Env, inputReaderHandle);
+            var ret = RunInputInfiniteLoop(inputReaderHandle);
             dbg.IsSilent = false;
+
+            dbg.Dispose(); dbg = null;
 
             Debug.Log($"Ending win32 coop thread (ret: {ret})");
         }).Start();
@@ -154,13 +154,13 @@ public class TestScript : MonoBehaviour
             {
                 if(dbg!= null)
                 {
-                    var arr = GetAvailableDevicesOfType(dbg.Env, RIM_DEVICETYPE.MOUSE).Consume();
+                    var arr = GetAvailableDevicesOfType(inputReaderHandle, RIM_DEVICETYPE.MOUSE).Consume();
                     Debug.Log($"Available mouse devices({arr.Length}): [{arr.MakeString()}]");
-                    arr = GetActiveDevicesOfType(dbg.Env, RIM_DEVICETYPE.MOUSE).Consume();
+                    arr = GetActiveDevicesOfType(inputReaderHandle, RIM_DEVICETYPE.MOUSE).Consume();
                     Debug.Log($"Active mouse devices({arr.Length}): [{arr.MakeString()}]...");
                     foreach(var handle in arr)
                     {
-                        var success = ReadMouseState(dbg.Env, handle, out var state);
+                        var success = ReadMouseState(inputReaderHandle, handle, out var state);
                         Debug.Log($"{handle}->{success}...{state}");
                         getLabel(handle).text = $"{handle}...{state}";
                     }
@@ -190,8 +190,7 @@ public class TestScript : MonoBehaviour
         dbg.IsSilent = false;
         var inputReaderHandle = this.inputReaderHandle;
         Debug.Log($"Stopping the input window({inputReaderHandle})");
-        var ret = StopInputInfiniteLoop(dbg.Env, inputReaderHandle);
+        var ret = StopInputInfiniteLoop(inputReaderHandle);
         Debug.Log($"Window stopping result: {ret}");
-        dbg.Dispose(); dbg = null;
     }
 }

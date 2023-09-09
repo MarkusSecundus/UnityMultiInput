@@ -24,36 +24,31 @@ struct mouse_state_t {
 	uint32_t button_flags = 0;
 };
 
-
 class input_tracker_t;
 
 
-struct environment_t{
-	struct {
-		void (__stdcall *format)(const char*);
-		void (__stdcall *integer)(int64_t);
-		void (__stdcall *pointer)(void*);
-		void (__stdcall *floating)(double);
-		void (__stdcall *cstring)(const char*);
-		void (__stdcall *wstring)(const wchar_t*);
-		void (__stdcall *flush)(void);
-	} debug;
-	input_tracker_t* input_tracker;
+
+struct debug_env_t{
+	void(__stdcall* format)(const char*);
+	void(__stdcall* integer)(int64_t);
+	void(__stdcall* pointer)(void*);
+	void(__stdcall* floating)(double);
+	void(__stdcall* cstring)(const char*);
+	void(__stdcall* wstring)(const wchar_t*);
+	void(__stdcall* flush)(void);
 };
+extern debug_env_t* _DebugEnv;
 
-typedef HWND input_reader_handle_t;
-
-
-#define DEBUGLOG(env, fformat, ...) {\
-	if(env){\
-		env->debug.format(fformat);\
-		auto ii = env->debug.integer;\
-		auto ff = env->debug.floating;\
-		auto pp = env->debug.pointer;\
-		auto ss = env->debug.cstring;\
-		auto wss = env->debug.wstring;\
+#define DEBUGLOG(fformat, ...) {\
+	if(_DebugEnv){\
+		_DebugEnv->format(fformat);\
+		auto ii = _DebugEnv->integer;\
+		auto ff = _DebugEnv->floating;\
+		auto pp = _DebugEnv->pointer;\
+		auto ss = _DebugEnv->cstring;\
+		auto wss = _DebugEnv->wstring;\
 		__VA_ARGS__;\
-		env->debug.flush();\
+		_DebugEnv->flush();\
 	}\
 }
 
@@ -61,24 +56,23 @@ typedef HWND input_reader_handle_t;
 
 extern "C" {
 	
-	BOOL DLL_EXPORT RegisterInputHandle(environment_t* env);
-	input_reader_handle_t DLL_EXPORT CreateInputHandle(environment_t* env);
-	BOOL DLL_EXPORT RunInputInfiniteLoop(environment_t* env, input_reader_handle_t);
-	BOOL DLL_EXPORT StopInputInfiniteLoop(environment_t* env, input_reader_handle_t);
+	input_tracker_t DLL_EXPORT *InitInputHandle();
+	BOOL DLL_EXPORT RunInputInfiniteLoop(input_tracker_t*);
+	BOOL DLL_EXPORT StopInputHandler(input_tracker_t*);
 
-	environment_t DLL_EXPORT *InitEnvironment(
-		decltype(environment_t{}.debug.format),
-		decltype(environment_t{}.debug.integer),
-		decltype(environment_t{}.debug.pointer),
-		decltype(environment_t{}.debug.floating),
-		decltype(environment_t{}.debug.cstring),
-		decltype(environment_t{}.debug.wstring),
-		decltype(environment_t{}.debug.flush) );
-	void DLL_EXPORT DestroyEnvironment(environment_t* env);
+	void DLL_EXPORT *InitDebug(
+		decltype(debug_env_t{}.format),
+		decltype(debug_env_t{}.integer),
+		decltype(debug_env_t{}.pointer),
+		decltype(debug_env_t{}.floating),
+		decltype(debug_env_t{}.cstring),
+		decltype(debug_env_t{}.wstring),
+		decltype(debug_env_t{}.flush) );
+	void DLL_EXPORT DestroyDebug();
 
 
-	BOOL DLL_EXPORT ReadMouseState(environment_t* env, MouseHandle mouse, mouse_state_t* out);
+	BOOL DLL_EXPORT ReadMouseState(input_tracker_t* tracker, MouseHandle mouse, mouse_state_t* out);
 
-	native_array_t DLL_EXPORT GetAvailableDevicesOfType(environment_t* env, int deviceType);
-	native_array_t DLL_EXPORT GetActiveDevicesOfType(environment_t* env, int deviceType);
+	native_array_t DLL_EXPORT GetAvailableDevicesOfType(input_tracker_t* tracker, int deviceType);
+	native_array_t DLL_EXPORT GetActiveDevicesOfType(input_tracker_t* tracker, int deviceType);
 }

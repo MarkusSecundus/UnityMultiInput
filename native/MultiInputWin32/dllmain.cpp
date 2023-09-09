@@ -11,7 +11,7 @@
 #include "macro_utils.h"
 
 static volatile HMODULE MainHModule;
-
+debug_env_t* _DebugEnv = nullptr;
 
 
 struct mutex_lock {
@@ -26,6 +26,8 @@ private:
 
 class input_tracker_t {
 public:
+    input_tracker_t(HWND window_handle_): window_handle(window_handle_){}
+
     mouse_state_t* find_mouse(MouseHandle h) {
         return &(mice[h]);
     }
@@ -38,6 +40,7 @@ public:
         }
         return ret;
     }
+    const HWND window_handle;
 
 private:
     std::mutex mut;
@@ -45,7 +48,6 @@ private:
     std::unordered_map<MouseHandle, mouse_state_t> mice;
 };
 
-volatile input_tracker_t* InputTracker;
 
 
 void _stdcall native_array_free(char* ptr) {
@@ -66,29 +68,28 @@ native_array_t to_native_array(std::vector<T>&& vec) {
 
 
 void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) {
-    auto env = (environment_t*)GetWindowLongPtrW(hwnd, 0);
-    auto tracker = env->input_tracker;
+    auto tracker = (input_tracker_t*)GetWindowLongPtr(hwnd, 0);
 
-    //DEBUGLOG(env, "Reading raw input {1}(handle: {2}) for window {0}", pp(hwnd), ii(inputCode), pp(inputHandle));
+    //DEBUGLOG("Reading raw input {1}(handle: {2}) for window {0}", pp(hwnd), ii(inputCode), pp(inputHandle));
 
     UINT dwSize = 0; 
     GetRawInputData(inputHandle, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
     auto lpb = std::make_unique<BYTE[]>(dwSize);
     if (!lpb)
     {
-        DEBUGLOG(env, "Allocation failed while handling raw input!\n");
+        DEBUGLOG("Allocation failed while handling raw input!\n");
         return;
     }
 
     if (GetRawInputData(inputHandle, RID_INPUT, lpb.get(), &dwSize, sizeof(RAWINPUTHEADER)) != dwSize) {
-        DEBUGLOG(env, "GetRawInputData does not return correct size !\n");
+        DEBUGLOG("GetRawInputData does not return correct size !\n");
     }
 
     RAWINPUT* raw = (RAWINPUT*)(lpb.get());
 
     if (raw->header.dwType == RIM_TYPEKEYBOARD)
     {
-        DEBUGLOG(env, " Kbd({6}): make={0} Flags:{1} Reserved:{2} ExtraInformation:{3}, msg={4} VK={5} \n",
+        DEBUGLOG("Kbd({6}): make={0} Flags:{1} Reserved:{2} ExtraInformation:{3}, msg={4} VK={5} \n",
             ii(raw->data.keyboard.MakeCode),
             ii(raw->data.keyboard.Flags),
             ii(raw->data.keyboard.Reserved),
@@ -102,7 +103,7 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
     else if (raw->header.dwType == RIM_TYPEMOUSE)
     {
         const auto& rm(raw->data.mouse);
-        DEBUGLOG(env, "Mouse({8}): usFlags={0} ulButtons={1} usButtonFlags={2} usButtonData={3} ulRawButtons={4} lLastX={5} lLastY={6} ulExtraInformation={7}\r\n",
+        DEBUGLOG("Mouse({8}): usFlags={0} ulButtons={1} usButtonFlags={2} usButtonData={3} ulRawButtons={4} lLastX={5} lLastY={6} ulExtraInformation={7}\r\n",
             ii(raw->data.mouse.usFlags),
             ii(raw->data.mouse.ulButtons),
             ii(raw->data.mouse.usButtonFlags),
@@ -166,12 +167,14 @@ LRESULT CALLBACK invisible_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 
 static const wchar_t INVISIBLE_WINDOW_CLASS_NAME[] = L"RawInputReaderWindow";
 
-static BOOL register_invisible_window_class(environment_t* env, HMODULE hModule, const wchar_t* window_class_name) {
+
+
+static BOOL register_invisible_window_class(HMODULE hModule, const wchar_t* window_class_name) {
 
     WNDCLASSEX wc;
 
     if (GetClassInfoExW(hModule, window_class_name, &wc)) {
-        DEBUGLOG(env, "Window class '{0}' already registered!", wss(window_class_name));
+        DEBUGLOG("Window class '{0}' already registered!", wss(window_class_name));
         return TRUE;
     }
 
@@ -189,50 +192,51 @@ static BOOL register_invisible_window_class(environment_t* env, HMODULE hModule,
     wc.hIconSm = LoadIconW(NULL, IDI_APPLICATION);
 
     if (!RegisterClassEx(&wc)) {
-        DEBUGLOG(env, "Window class ({0}) registration failed!", wss(window_class_name));
+        DEBUGLOG("Window class ({0}) registration failed!", wss(window_class_name));
         return FALSE;
     } 
-    DEBUGLOG(env, "Window class '{0}' registered successfully!", wss(window_class_name));
+    DEBUGLOG("Window class '{0}' registered successfully!", wss(window_class_name));
     return TRUE;
     
 }
 
-static HWND create_invisible_window(environment_t* env, HMODULE hModule, const wchar_t* window_class_name) {
+static HWND create_invisible_window(HMODULE hModule, const wchar_t* window_class_name) {
     HWND hwnd = CreateWindowEx(
         WS_EX_CLIENTEDGE,
         window_class_name,
-        L"The title of my window",
+        L"Rawinput processor window",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT, 240, 120,
         NULL, NULL, hModule, NULL);
     if (hwnd == NULL)
     {
-        DEBUGLOG(env, "Window Creation Failed!");
+        DEBUGLOG("Window Creation Failed!");
         return NULL;
     }
-    SetWindowLongPtrW(hwnd, 0, (LONG_PTR)env);
-    DEBUGLOG(env, "Successfully created window {0}", pp(hwnd));
+    DEBUGLOG("Successfully created window {0}", pp(hwnd));
     UpdateWindow(hwnd);
     return hwnd;
 }
-static BOOL run_infinite_message_loop(environment_t* env) {
+static BOOL run_infinite_message_loop() {
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0) > 0)
     {
-        //DEBUGLOG(env, "Dispatching a message: {0}", ii(msg.message));
+        //DEBUGLOG("Dispatching a message: {0}", ii(msg.message));
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
     return msg.wParam;
 }
 
-static BOOL stop_window(environment_t* env, HWND window) {
-    DEBUGLOG(env, "Posting the WM_CLOSE message to {0}", pp(window));
+static BOOL stop_window(HWND window) {
+    DEBUGLOG("Posting the WM_CLOSE message to {0}", pp(window));
     return SendMessageW(window, WM_CLOSE, 0, 0);
 }
 
 
-static BOOL register_for_raw_input(environment_t* env, HMODULE hModule, HWND window) {
+
+
+static BOOL register_for_raw_input(HMODULE hModule, HWND window) {
 #if 1
     RAWINPUTDEVICE deviceDefinitions[2];
 
@@ -262,7 +266,7 @@ static BOOL register_for_raw_input(environment_t* env, HMODULE hModule, HWND win
 
 
 /// <param name="rimType">Can be either RIM_TYPEMOUSE, RIM_TYPEKEYBOARD, RIM_TYPEHID</param>
-static std::vector<HANDLE> list_all_raw_input_devices_of_type(environment_t* env, int rimType) {
+static std::vector<HANDLE> list_all_raw_input_devices_of_type(int rimType) {
     UINT numDevices = 0;
     if (GetRawInputDeviceList(NULL, &numDevices, sizeof(RAWINPUTDEVICELIST)) == -1) return std::vector<HANDLE>{};
 
@@ -280,62 +284,63 @@ static std::vector<HANDLE> list_all_raw_input_devices_of_type(environment_t* env
 
 
 extern "C" {
-    environment_t  *InitEnvironment(
-        decltype(environment_t{}.debug.format) format,
-        decltype(environment_t{}.debug.integer) integer,
-        decltype(environment_t{}.debug.pointer) pointer,
-        decltype(environment_t{}.debug.floating) floating,
-        decltype(environment_t{}.debug.cstring) cstring,
-        decltype(environment_t{}.debug.wstring) wstring,
-        decltype(environment_t{}.debug.flush) flush
+    void  *InitDebug(
+        decltype(debug_env_t{}.format) format,
+        decltype(debug_env_t{}.integer) integer,
+        decltype(debug_env_t{}.pointer) pointer,
+        decltype(debug_env_t{}.floating) floating,
+        decltype(debug_env_t{}.cstring) cstring,
+        decltype(debug_env_t{}.wstring) wstring,
+        decltype(debug_env_t{}.flush) flush
     ) {
-        environment_t *ret = new environment_t();
+        debug_env_t *ret = new debug_env_t();
         if (!ret) return NULL;
-        ret->debug.format = format;
-        ret->debug.integer = integer;
-        ret->debug.pointer = pointer;
-        ret->debug.floating = floating;
-        ret->debug.cstring = cstring;
-        ret->debug.wstring = wstring;
-        ret->debug.flush = flush;
+        _DebugEnv = ret;
+        ret->format = format;
+        ret->integer = integer;
+        ret->pointer = pointer;
+        ret->floating = floating;
+        ret->cstring = cstring;
+        ret->wstring = wstring;
+        ret->flush = flush;
         
-        ret->input_tracker = new input_tracker_t();
-
-        DEBUGLOG(ret, "Environment {0} successfully initialized!", pp(ret));
+        DEBUGLOG("Environment {0} successfully initialized!", pp(ret));
 
         return ret;
     }
 
-    void DLL_EXPORT DestroyEnvironment(environment_t* env) { if (env) {
-        DEBUGLOG(env, "Destroying the environment {0}", ii((int64_t)env)); 
-        delete env->input_tracker;
-        delete env; 
-    } }
-
-
-    BOOL DLL_EXPORT RegisterInputHandle(environment_t* env) {
-        return TRUE;
+    void DLL_EXPORT DestroyDebug() { 
+        if (_DebugEnv) {
+            DEBUGLOG("Destroying the environment {0}", pp(_DebugEnv)); 
+            delete _DebugEnv;
+            _DebugEnv = nullptr;
+        } 
     }
-    input_reader_handle_t DLL_EXPORT CreateInputHandle(environment_t* env) {
+
+
+    input_tracker_t DLL_EXPORT *InitInputHandle() {
         HMODULE hModule = MainHModule;
-        if(!register_invisible_window_class(env, hModule, INVISIBLE_WINDOW_CLASS_NAME))
-            return NULL;
-        auto ret = create_invisible_window(env, hModule, INVISIBLE_WINDOW_CLASS_NAME);
-        if (!ret) return NULL;
-        if (!register_for_raw_input(env, hModule, ret))
-            DEBUGLOG(env, "Registration for raw input failed!");
+        if(!register_invisible_window_class(hModule, INVISIBLE_WINDOW_CLASS_NAME))
+            return nullptr;
+        auto hwnd = create_invisible_window(hModule, INVISIBLE_WINDOW_CLASS_NAME);
+        if (!hwnd) return nullptr;
+        if (!register_for_raw_input(hModule, hwnd))
+            DEBUGLOG("Registration for raw input failed!");
+        input_tracker_t* ret = new input_tracker_t(hwnd);
+        SetWindowLongPtrW(hwnd, 0, (LONG_PTR)ret);
         return ret;
     }
-    BOOL DLL_EXPORT RunInputInfiniteLoop(environment_t* env, input_reader_handle_t hwnd) {
-        return run_infinite_message_loop(env);
+    BOOL DLL_EXPORT RunInputInfiniteLoop(input_tracker_t* tracker) {
+        return run_infinite_message_loop();
     }
-    BOOL DLL_EXPORT StopInputInfiniteLoop(environment_t* env, input_reader_handle_t hwnd) {
-        return stop_window(env, hwnd);
+    BOOL DLL_EXPORT StopInputInfiniteLoop(input_tracker_t* tracker) {
+        auto ret = stop_window(tracker->window_handle);
+        delete tracker;
+        return ret;
     }
 
 
-    BOOL DLL_EXPORT ReadMouseState(environment_t* env, MouseHandle mouse, mouse_state_t* out) {
-        auto tracker = env->input_tracker;
+    BOOL DLL_EXPORT ReadMouseState(input_tracker_t* tracker, MouseHandle mouse, mouse_state_t* out) {
         auto _ = tracker->lock();
 
         auto state = tracker->find_mouse(mouse);
@@ -344,12 +349,12 @@ extern "C" {
         return TRUE;
     }
 
-    native_array_t DLL_EXPORT GetAvailableDevicesOfType(environment_t* env, int deviceType) {
-        return to_native_array(list_all_raw_input_devices_of_type(env, deviceType));
+    native_array_t DLL_EXPORT GetAvailableDevicesOfType(input_tracker_t* tracker, int deviceType) {
+        return to_native_array(list_all_raw_input_devices_of_type(deviceType));
     }
-    native_array_t DLL_EXPORT GetActiveDevicesOfType(environment_t* env, int deviceType) {
+    native_array_t DLL_EXPORT GetActiveDevicesOfType(input_tracker_t* tracker, int deviceType) {
         if (deviceType == RIM_TYPEMOUSE)
-            return to_native_array(env->input_tracker->get_active_mice());
+            return to_native_array(tracker->get_active_mice());
         else
             return native_array_t::empty();
     }
