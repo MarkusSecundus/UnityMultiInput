@@ -8,6 +8,11 @@ using UnityEngine;
 using System.Linq;
 
 using MarkusSecundus.Utils.Native;
+using TMPro;
+
+
+using MouseHandle = System.IntPtr;
+using EnvHandle = System.IntPtr;
 
 public enum RIM_DEVICETYPE : int
 {
@@ -16,35 +21,38 @@ public enum RIM_DEVICETYPE : int
 
 public class TestScript : MonoBehaviour
 {
+
     [DllImport("MultiInputWin32.dll")]
-    public static extern int RegisterInputHandle(IntPtr env);
+    public static extern int RegisterInputHandle(EnvHandle env);
     [DllImport("MultiInputWin32.dll")]
-    public static extern IntPtr CreateInputHandle(IntPtr env);
+    public static extern IntPtr CreateInputHandle(EnvHandle env);
     [DllImport("MultiInputWin32.dll")]
-    public static extern int RunInputInfiniteLoop(IntPtr env, IntPtr inputReaderHandle);
+    public static extern int RunInputInfiniteLoop(EnvHandle env, MouseHandle inputReaderHandle);
     [DllImport("MultiInputWin32.dll")]
-    public static extern int StopInputInfiniteLoop(IntPtr env, IntPtr inputReaderHandle);
+    public static extern int StopInputInfiniteLoop(EnvHandle env, MouseHandle inputReaderHandle);
 
 
 
     [DllImport("MultiInputWin32.dll")]
-    public static extern IntPtr InitEnvironment(NativeAction<string> format, NativeAction<long> integer, NativeAction<IntPtr> pointer, NativeAction<double> floating, NativeAction<string> cstring, NativeWstringAction wstring, NativeAction flush);
+    public static extern EnvHandle InitEnvironment(NativeAction<string> format, NativeAction<long> integer, NativeAction<IntPtr> pointer, NativeAction<double> floating, NativeAction<string> cstring, NativeWstringAction wstring, NativeAction flush);
     [DllImport("MultiInputWin32.dll")]
-    public static extern void DestroyEnvironment(IntPtr env);
+    public static extern void DestroyEnvironment(EnvHandle env);
 
 
     
     [DllImport("MultiInputWin32.dll")]
-    public static extern int ReadMouseState(IntPtr env, IntPtr mouseHandle, out MouseInputFrame ret);
+    public static extern int ReadMouseState(EnvHandle env, MouseHandle mouseHandle, out MouseInputFrame ret);
 
     
     [DllImport("MultiInputWin32.dll")]
-    public static extern NativeArray<IntPtr> GetAvailableDevicesOfType(IntPtr env, RIM_DEVICETYPE deviceType);
+    public static extern NativeArray<MouseHandle> GetAvailableDevicesOfType(EnvHandle env, RIM_DEVICETYPE deviceType);
     [DllImport("MultiInputWin32.dll")]
-    public static extern NativeArray<IntPtr> GetActiveDevicesOfType(IntPtr env, RIM_DEVICETYPE deviceType);
+    public static extern NativeArray<MouseHandle> GetActiveDevicesOfType(EnvHandle env, RIM_DEVICETYPE deviceType);
 
 
+    public TMP_Text debugPrototype;
 
+    Dictionary<MouseHandle, TMP_Text> debuggersForMice = new();
 
     class NativeDebugManager : IDisposable
     {
@@ -154,10 +162,24 @@ public class TestScript : MonoBehaviour
                     {
                         var success = ReadMouseState(dbg.Env, handle, out var state);
                         Debug.Log($"{handle}->{success}...{state}");
+                        getLabel(handle).text = $"{handle}...{state}";
                     }
                     
                 }
                 yield return new WaitForSeconds(0.25f);
+
+                TMP_Text getLabel(MouseHandle h)
+                {
+                    if (debuggersForMice.TryGetValue(h, out var ret)) return ret;
+                    ret = Instantiate(debugPrototype);
+                    ret.transform.SetParent(debugPrototype.transform.parent);
+                    ret.gameObject.SetActive(true);
+
+                    ret.rectTransform.position = new Vector2(UnityEngine.Random.Range(100, Camera.main.scaledPixelWidth/2), UnityEngine.Random.Range(100, Camera.main.scaledPixelHeight/2));
+
+                    debuggersForMice[h] = ret;
+                    return ret;
+                }
             }
         }
     }
