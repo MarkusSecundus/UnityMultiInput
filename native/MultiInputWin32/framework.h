@@ -19,7 +19,6 @@ struct native_array_t {
 
 using MouseHandle = HANDLE;
 struct mouse_state_t {
-public:
 	int32_t x = 0, y = 0;
 	int32_t main_scroll = 0, horizontal_scroll = 0;
 	uint32_t button_flags = 0;
@@ -27,7 +26,6 @@ public:
 
 
 class input_tracker_t;
-
 
 
 struct environment_t{
@@ -83,6 +81,4 @@ extern "C" {
 
 	native_array_t DLL_EXPORT GetAvailableDevicesOfType(environment_t* env, int deviceType);
 	native_array_t DLL_EXPORT GetActiveDevicesOfType(environment_t* env, int deviceType);
-
-	void DLL_EXPORT NativeFree(char* toFree);
 }
