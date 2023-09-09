@@ -40,7 +40,7 @@ public class TestScript : MonoBehaviour
 
     
     [DllImport("MultiInputWin32.dll")]
-    public static extern int ReadMouseState(InputHandle tracker, MouseHandle mouseHandle, out MouseInputFrame ret);
+    public static extern MouseInputFrame ConsumeMouseState(InputHandle tracker, MouseHandle mouseHandle);
 
     
     [DllImport("MultiInputWin32.dll")]
@@ -50,6 +50,7 @@ public class TestScript : MonoBehaviour
 
 
     public TMP_Text debugPrototype;
+    public Vector2 speedMultiplier;
 
     Dictionary<MouseHandle, TMP_Text> debuggersForMice = new();
 
@@ -103,8 +104,9 @@ public class TestScript : MonoBehaviour
         public int x, y;
         public int main_scroll, horizontal_scroll;
         public ButtonFlags button_flags;
+        public bool was_absolute;
 
-        public override string ToString() => $"<({x}, {y})-sc({main_scroll}::{horizontal_scroll})-fl({(uint)button_flags:x})>";
+        public override string ToString() => was_absolute?"A":"R" + $"<({x}, {y})-sc({main_scroll}::{horizontal_scroll})-fl({(uint)button_flags:x})>";
 
         public enum ButtonFlags : uint
         {
@@ -160,13 +162,15 @@ public class TestScript : MonoBehaviour
                     Debug.Log($"Active mouse devices({arr.Length}): [{arr.MakeString()}]...");
                     foreach(var handle in arr)
                     {
-                        var success = ReadMouseState(inputReaderHandle, handle, out var state);
-                        Debug.Log($"{handle}->{success}...{state}");
-                        getLabel(handle).text = $"{handle}...{state}";
+                        var state = ConsumeMouseState(inputReaderHandle, handle);
+                        Debug.Log($"{handle}.....{state}");
+                        var lbl = getLabel(handle);
+                        lbl.text = $"{handle}...{state}";
+                        lbl.rectTransform.position += new Vector3(state.x * speedMultiplier.x, state.y * speedMultiplier.y);
                     }
                     
                 }
-                yield return new WaitForSeconds(0.25f);
+                yield return null;// new WaitForSeconds(0.25f);
 
                 TMP_Text getLabel(MouseHandle h)
                 {

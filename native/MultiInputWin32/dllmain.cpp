@@ -106,6 +106,7 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
             {
                 m->x = rm.lLastX;
                 m->y = rm.lLastY;
+                m->was_absolute = true;
             }
             else {
                 m->x += rm.lLastX;
@@ -225,7 +226,7 @@ static BOOL register_for_raw_input(HMODULE hModule, HWND window) {
 
     deviceDefinitions[0].dwFlags = 0;
     deviceDefinitions[0].usUsagePage = 0x0001;
-    deviceDefinitions[0].usUsage = 0x0001;
+    deviceDefinitions[0].usUsage = 0x0002;
     deviceDefinitions[0].hwndTarget = window;
 
     deviceDefinitions[1].dwFlags = 0;
@@ -269,8 +270,6 @@ static std::vector<HANDLE> list_all_raw_input_devices_of_type(int rimType) {
 
 
 extern "C" {
-
-
     input_tracker_t DLL_EXPORT *InitInputHandle() {
         HMODULE hModule = MainHModule;
         if(!register_invisible_window_class(hModule, INVISIBLE_WINDOW_CLASS_NAME))
@@ -293,13 +292,13 @@ extern "C" {
     }
 
 
-    BOOL DLL_EXPORT ReadMouseState(input_tracker_t* tracker, MouseHandle mouse, mouse_state_t* out) {
+    mouse_state_t DLL_EXPORT ConsumeMouseState(input_tracker_t* tracker, MouseHandle mouse) {
         auto _ = tracker->lock();
 
         auto state = tracker->find_mouse(mouse);
-        *out = *state;
-        state->button_flags = 0;
-        return TRUE;
+        auto ret = *state;
+        *state = mouse_state_t();
+        return ret;
     }
 
     native_array_t DLL_EXPORT GetAvailableDevicesOfType(input_tracker_t* tracker, int deviceType) {

@@ -256,6 +256,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   debugPrototype: {fileID: 1121055063}
+  speedMultiplier: {x: 1, y: -1}
 --- !u!4 &287042942
 Transform:
   m_ObjectHideFlags: 0
