@@ -8,10 +8,9 @@
 #include<vector>
 #include<optional>
 
-#include "macro_utils.h"
+#include"framework.h"
 
 static volatile HMODULE MainHModule;
-debug_env_t* _DebugEnv = nullptr;
 
 
 struct mutex_lock {
@@ -49,22 +48,6 @@ private:
 };
 
 
-
-void _stdcall native_array_free(char* ptr) {
-    free(ptr);
-}
-template<typename T>
-native_array_t to_native_array(std::vector<T>&& vec) {
-    T* ret = (T*)malloc(vec.size()*sizeof(T));
-    if (!ret) 
-        return native_array_t::error();
-    
-    size_t pos = 0;
-    for (auto it = vec.begin(); it != vec.end();)
-        ret[pos++] = *(it++);
-
-    return native_array_t((char*)(void*)ret, vec.size(), native_array_free);
-}
 
 
 void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) {
@@ -283,39 +266,9 @@ static std::vector<HANDLE> list_all_raw_input_devices_of_type(int rimType) {
 }
 
 
+
+
 extern "C" {
-    void  *InitDebug(
-        decltype(debug_env_t{}.format) format,
-        decltype(debug_env_t{}.integer) integer,
-        decltype(debug_env_t{}.pointer) pointer,
-        decltype(debug_env_t{}.floating) floating,
-        decltype(debug_env_t{}.cstring) cstring,
-        decltype(debug_env_t{}.wstring) wstring,
-        decltype(debug_env_t{}.flush) flush
-    ) {
-        debug_env_t *ret = new debug_env_t();
-        if (!ret) return NULL;
-        _DebugEnv = ret;
-        ret->format = format;
-        ret->integer = integer;
-        ret->pointer = pointer;
-        ret->floating = floating;
-        ret->cstring = cstring;
-        ret->wstring = wstring;
-        ret->flush = flush;
-        
-        DEBUGLOG("Environment {0} successfully initialized!", pp(ret));
-
-        return ret;
-    }
-
-    void DLL_EXPORT DestroyDebug() { 
-        if (_DebugEnv) {
-            DEBUGLOG("Destroying the environment {0}", pp(_DebugEnv)); 
-            delete _DebugEnv;
-            _DebugEnv = nullptr;
-        } 
-    }
 
 
     input_tracker_t DLL_EXPORT *InitInputHandle() {
@@ -350,11 +303,11 @@ extern "C" {
     }
 
     native_array_t DLL_EXPORT GetAvailableDevicesOfType(input_tracker_t* tracker, int deviceType) {
-        return to_native_array(list_all_raw_input_devices_of_type(deviceType));
+        return native_array_t::make(list_all_raw_input_devices_of_type(deviceType));
     }
     native_array_t DLL_EXPORT GetActiveDevicesOfType(input_tracker_t* tracker, int deviceType) {
         if (deviceType == RIM_TYPEMOUSE)
-            return to_native_array(tracker->get_active_mice());
+            return native_array_t::make(tracker->get_active_mice());
         else
             return native_array_t::empty();
     }

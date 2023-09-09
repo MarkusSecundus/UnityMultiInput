@@ -8,6 +8,8 @@
 #define PCH_H
 
 // sem přidejte hlavičky, které chcete předkompilovat
+#include "utils.h"
+#include "debug.h"
 #include "framework.h"
 
 #endif //PCH_H
