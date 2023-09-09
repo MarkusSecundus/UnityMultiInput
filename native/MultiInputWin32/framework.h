@@ -6,9 +6,15 @@
 
 
 struct native_array_t {
-	native_array_t(char* begin_, int64_t length_):begin(begin_), length(length_){}
+	using destructor_t = void(_stdcall*)(char*);
+
+	native_array_t(char* begin_, int64_t length_, destructor_t destructor_):begin(begin_), destructor(destructor_), length(length_) {}
 	char* begin;
+	destructor_t destructor;
 	int32_t length;
+
+	static inline native_array_t error() { return native_array_t(nullptr, -1, nullptr); }
+	static inline native_array_t empty() { return native_array_t(nullptr, 0, nullptr); }
 };
 
 using MouseHandle = HANDLE;
@@ -26,13 +32,13 @@ class input_tracker_t;
 
 struct environment_t{
 	struct {
-		void (*format)(const char*);
-		void (*integer)(int64_t);
-		void (*pointer)(void*);
-		void (*floating)(double);
-		void (*cstring)(const char*);
-		void (*wstring)(const wchar_t*);
-		void (*flush)(void);
+		void (__stdcall *format)(const char*);
+		void (__stdcall *integer)(int64_t);
+		void (__stdcall *pointer)(void*);
+		void (__stdcall *floating)(double);
+		void (__stdcall *cstring)(const char*);
+		void (__stdcall *wstring)(const wchar_t*);
+		void (__stdcall *flush)(void);
 	} debug;
 	input_tracker_t* input_tracker;
 };

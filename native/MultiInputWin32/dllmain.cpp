@@ -47,20 +47,21 @@ private:
 
 volatile input_tracker_t* InputTracker;
 
+
+void _stdcall native_array_free(char* ptr) {
+    free(ptr);
+}
 template<typename T>
 native_array_t to_native_array(std::vector<T>&& vec) {
     T* ret = (T*)malloc(vec.size()*sizeof(T));
     if (!ret) 
-        return native_array_t(NULL, -1);
+        return native_array_t::error();
     
     size_t pos = 0;
     for (auto it = vec.begin(); it != vec.end();)
         ret[pos++] = *(it++);
 
-    return native_array_t((char*)(void*)ret, vec.size());
-}
-void native_array_free(char* ptr) {
-    free(ptr);
+    return native_array_t((char*)(void*)ret, vec.size(), native_array_free);
 }
 
 
@@ -350,10 +351,8 @@ extern "C" {
         if (deviceType == RIM_TYPEMOUSE)
             return to_native_array(env->input_tracker->get_active_mice());
         else
-            return native_array_t(nullptr, 0);
+            return native_array_t::empty();
     }
-
-    void DLL_EXPORT NativeFree(char* toFree) { native_array_free(toFree); }
 }
 
 

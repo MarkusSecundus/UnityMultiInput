@@ -7,6 +7,8 @@ using Unity.VisualScripting;
 using UnityEngine;
 using System.Linq;
 
+using MarkusSecundus.Utils.Native;
+
 public enum RIM_DEVICETYPE : int
 {
     MOUSE=0, KEYBOARD=1, HID=2
@@ -24,10 +26,9 @@ public class TestScript : MonoBehaviour
     public static extern int StopInputInfiniteLoop(IntPtr env, IntPtr inputReaderHandle);
 
 
-    public delegate void NativeWstringAction([MarshalAs(UnmanagedType.LPTStr)] string s);
 
     [DllImport("MultiInputWin32.dll")]
-    public static extern IntPtr InitEnvironment(Action<string> format, Action<long> integer, Action<IntPtr> pointer, Action<double> floating, Action<string> cstring, NativeWstringAction wstring, Action flush);
+    public static extern IntPtr InitEnvironment(NativeAction<string> format, NativeAction<long> integer, NativeAction<IntPtr> pointer, NativeAction<double> floating, NativeAction<string> cstring, NativeWstringAction wstring, NativeAction flush);
     [DllImport("MultiInputWin32.dll")]
     public static extern void DestroyEnvironment(IntPtr env);
 
@@ -38,23 +39,25 @@ public class TestScript : MonoBehaviour
 
     
     [DllImport("MultiInputWin32.dll")]
-    public static extern NativeUtils.NativeArray GetAvailableDevicesOfType(IntPtr env, RIM_DEVICETYPE deviceType);
+    public static extern NativeArray<IntPtr> GetAvailableDevicesOfType(IntPtr env, RIM_DEVICETYPE deviceType);
     [DllImport("MultiInputWin32.dll")]
-    public static extern NativeUtils.NativeArray GetActiveDevicesOfType(IntPtr env, RIM_DEVICETYPE deviceType);
+    public static extern NativeArray<IntPtr> GetActiveDevicesOfType(IntPtr env, RIM_DEVICETYPE deviceType);
 
 
 
 
     class NativeDebugManager : IDisposable
     {
+        
+
         public bool IsSilent = false;
-        Action<string> format;
-        Action<long> integer;
-        Action<IntPtr> pointer;
-        Action<double> floating;
-        Action<string> cstring;
+        NativeAction<string> format;
+        NativeAction<long> integer;
+        NativeAction<IntPtr> pointer;
+        NativeAction<double> floating;
+        NativeAction<string> cstring;
         NativeWstringAction wstring;
-        Action flush, silentFlush;
+        NativeAction flush, silentFlush;
         string formatString = "";
         List<object> args = new List<object>();
         public readonly IntPtr Env;
@@ -143,9 +146,9 @@ public class TestScript : MonoBehaviour
             {
                 if(dbg!= null)
                 {
-                    var arr = GetAvailableDevicesOfType(dbg.Env, RIM_DEVICETYPE.MOUSE).Consume<IntPtr>();
+                    var arr = GetAvailableDevicesOfType(dbg.Env, RIM_DEVICETYPE.MOUSE).Consume();
                     Debug.Log($"Available mouse devices({arr.Length}): [{arr.MakeString()}]");
-                    arr = GetActiveDevicesOfType(dbg.Env, RIM_DEVICETYPE.MOUSE).Consume<IntPtr>();
+                    arr = GetActiveDevicesOfType(dbg.Env, RIM_DEVICETYPE.MOUSE).Consume();
                     Debug.Log($"Active mouse devices({arr.Length}): [{arr.MakeString()}]...");
                     foreach(var handle in arr)
                     {
