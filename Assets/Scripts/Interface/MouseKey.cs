@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Collections;
 using UnityEngine;
 
 public enum MouseKeyCode
@@ -18,7 +19,7 @@ public static class MouseKeyCodeHelpers
                                                         ? throw new System.ArgumentOutOfRangeException($"number {index} is not valid mouse key index!")
                                                         : (index + (MouseKeyCode.LeftButton));
 
-    public static IReadOnlyList<MouseKeyCode> AllMouseKeyCodes = Enumerable.Range((int)MouseKeyCode.LeftButton, (int)MouseKeyCode.Button4).Cast<MouseKeyCode>().ToArray();
+    public static IReadOnlyList<MouseKeyCode> AllMouseKeyCodes = CollectionUtils.RangeFromToExclusive((int)MouseKeyCode.LeftButton, (int)MouseKeyCode.Button4+1).Cast<MouseKeyCode>().ToArray();
 
     public static int AsMouseKeyIndex(this MouseKeyCode code) => (int)code - (int)MouseKeyCode.LeftButton;
     public static KeyCode AsKeyCode(this MouseKeyCode code) => (KeyCode)(int)code;

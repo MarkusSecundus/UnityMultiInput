@@ -102,7 +102,7 @@ public class MultiInputManager : MonoBehaviour
     {
         public int x, y;
         public int mainScroll, horizontalScroll;
-        public ButtonPressFlags buttonFlags;
+        public MouseButtonPressFlags buttonFlags;
         public bool wasAbsolute;
 
         public override string ToString() => $"{(wasAbsolute ? "A":"R")}<({x}, {y})-sc({mainScroll}::{horizontalScroll})-fl({(uint)buttonFlags:x})>";
@@ -193,7 +193,7 @@ public class MultiInputManager : MonoBehaviour
         public Vector2 AxesRaw { get; set; }
 
 
-        internal ButtonPressFlags buttonFlags;
+        internal MouseButtonPressFlags buttonFlags;
 
         public bool GetButton(MouseKeyCode buttonNumber) => (int)(buttonFlags & buttonNumber.GetButtonPressedFlag()) != 0;
 
@@ -201,9 +201,9 @@ public class MultiInputManager : MonoBehaviour
 
         public bool GetButtonUp(MouseKeyCode buttonNumber) => (int)(buttonFlags & buttonNumber.GetButtonUpFlag()) != 0;
 
-        public bool IsButtonDown => (int)(buttonFlags & ButtonPressFlags.RI_MOUSE_BUTTON_DOWN_BLOCK) != 0;
-        public bool IsButtonUp => (int)(buttonFlags & ButtonPressFlags.RI_MOUSE_BUTTON_UP_BLOCK) != 0;
-        public bool IsButtonPressed => (int)(buttonFlags & ButtonPressFlags.RI_MOUSE_BUTTON_PRESSED_BLOCK) != 0;
+        public bool IsButtonDown => (int)(buttonFlags & MouseButtonPressFlags.RI_MOUSE_BUTTON_DOWN_BLOCK) != 0;
+        public bool IsButtonUp => (int)(buttonFlags & MouseButtonPressFlags.RI_MOUSE_BUTTON_UP_BLOCK) != 0;
+        public bool IsButtonPressed => (int)(buttonFlags & MouseButtonPressFlags.RI_MOUSE_BUTTON_PRESSED_BLOCK) != 0;
 
         public IMouse.Configuration Config { get; set; } = IMouse.Configuration.Default;
 
@@ -212,31 +212,26 @@ public class MultiInputManager : MonoBehaviour
         internal void UpdateState(MouseInputFrame frame)
         {
             Position += new Vector2(frame.x * Config.MouseSpeed.x, frame.y * Config.MouseSpeed.y);
-            ScrollDelta = frame.mainScroll * Config.ScrollSpeed;
             
             var axesRaw = new Vector2(frame.x * Config.AxisScale.x, frame.y * Config.AxisScale.y).Clamp(-1f, 1f);
             Axes = Vector2.Lerp(AxesRaw/*from last frame*/, axesRaw, 0.6f);
             AxesRaw = axesRaw;
 
+
+            ScrollDelta = frame.mainScroll * Config.ScrollSpeed;
+
             foreach (var keycode in MouseKeyCodeHelpers.AllMouseKeyCodes)
                 if (GetButtonUp(keycode))
-                {
                     buttonFlags &= ~keycode.GetButtonPressedFlag();
-                    //Debug.Log($"Key unpressed: {keycode}");
-                }
-            buttonFlags &= ~(ButtonPressFlags.RI_MOUSE_BUTTON_UP_DOWN_BLOCK);
-            buttonFlags |= (frame.buttonFlags & ButtonPressFlags.RI_MOUSE_BUTTON_UP_DOWN_BLOCK);
+            buttonFlags &= ~(MouseButtonPressFlags.RI_MOUSE_BUTTON_UP_DOWN_BLOCK);
+            buttonFlags |= (frame.buttonFlags & MouseButtonPressFlags.RI_MOUSE_BUTTON_UP_DOWN_BLOCK);
             foreach (var keycode in MouseKeyCodeHelpers.AllMouseKeyCodes)
                 if (GetButtonDown(keycode))
-                {
                     buttonFlags |= keycode.GetButtonPressedFlag();
-                    //Debug.Log($"Key pressed: {keycode}");
-                }
 
             Cursor.rectTransform.position = Position;
         }
     }
-
 
     public void OnDestroy()
     {
@@ -246,10 +241,11 @@ public class MultiInputManager : MonoBehaviour
         Debug.Log($"Window stopping result: {ret}", this);
         Cursor.lockState = CursorLockMode.None;
     }
+
 }
 
 
-public enum ButtonPressFlags : int
+public enum MouseButtonPressFlags : int
 {
     RI_MOUSE_LEFT_BUTTON_DOWN = 1 << 0,
     RI_MOUSE_LEFT_BUTTON_UP = 1 << 1,
@@ -275,10 +271,10 @@ public enum ButtonPressFlags : int
 
     RI_MOUSE_BUTTON_PRESSED_BLOCK = (~0) << 20
 }
-public static class ButtonFlagsHelpers
+public static class MouseButtonPressFlagsHelpers
 {
-    public static ButtonPressFlags GetButtonDownFlag(this MouseKeyCode code) => (ButtonPressFlags)(1 << (code.AsMouseKeyIndex() * 2));
-    public static ButtonPressFlags GetButtonUpFlag(this MouseKeyCode code) => (ButtonPressFlags)(1 << (code.AsMouseKeyIndex() * 2 + 1));
-    public static ButtonPressFlags GetButtonPressedFlag(this MouseKeyCode code) => (ButtonPressFlags)(1 << (code.AsMouseKeyIndex() +20));
+    public static MouseButtonPressFlags GetButtonDownFlag(this MouseKeyCode code) => (MouseButtonPressFlags)(1 << (code.AsMouseKeyIndex() * 2));
+    public static MouseButtonPressFlags GetButtonUpFlag(this MouseKeyCode code) => (MouseButtonPressFlags)(1 << (code.AsMouseKeyIndex() * 2 + 1));
+    public static MouseButtonPressFlags GetButtonPressedFlag(this MouseKeyCode code) => (MouseButtonPressFlags)(1 << (code.AsMouseKeyIndex() +20));
 }
 #endif
