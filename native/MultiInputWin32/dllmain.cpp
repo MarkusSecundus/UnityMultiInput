@@ -4,23 +4,11 @@
 #include<stdio.h>
 #include<memory>
 #include<unordered_map>
-#include<mutex>
 #include<vector>
-#include<optional>
 
 #include"framework.h"
 
 static volatile HMODULE MainHModule;
-
-
-struct mutex_lock {
-    mutex_lock(std::mutex *mutex) :m(mutex) { m->lock(); }
-    ~mutex_lock() { m->unlock(); }
-private:
-    std::mutex *m;
-};
-
-
 
 
 class input_tracker_t {
@@ -72,7 +60,7 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
 
     if (raw->header.dwType == RIM_TYPEKEYBOARD)
     {
-        DEBUGLOG("Kbd({6}): make={0} Flags:{1} Reserved:{2} ExtraInformation:{3}, msg={4} VK={5} \n",
+        /*DEBUGLOG("Kbd({6}): make={0} Flags:{1} Reserved:{2} ExtraInformation:{3}, msg={4} VK={5} \n",
             ii(raw->data.keyboard.MakeCode),
             ii(raw->data.keyboard.Flags),
             ii(raw->data.keyboard.Reserved),
@@ -80,13 +68,13 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
             ii(raw->data.keyboard.Message),
             ii(raw->data.keyboard.VKey),
             pp(raw->header.hDevice)
-        );
+        );*/
 
     }
     else if (raw->header.dwType == RIM_TYPEMOUSE)
     {
         const auto& rm(raw->data.mouse);
-        DEBUGLOG("Mouse({8}): usFlags={0} ulButtons={1} usButtonFlags={2} usButtonData={3} ulRawButtons={4} lLastX={5} lLastY={6} ulExtraInformation={7}\r\n",
+        /*DEBUGLOG("Mouse({8}): usFlags={0} ulButtons={1} usButtonFlags={2} usButtonData={3} ulRawButtons={4} lLastX={5} lLastY={6} ulExtraInformation={7}\r\n",
             ii(raw->data.mouse.usFlags),
             ii(raw->data.mouse.ulButtons),
             ii(raw->data.mouse.usButtonFlags),
@@ -96,7 +84,7 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
             ii(raw->data.mouse.lLastY),
             ii(raw->data.mouse.ulExtraInformation),
             pp(raw->header.hDevice)
-        );
+        );*/
 
         {   auto _ = tracker->lock();
 
@@ -266,7 +254,26 @@ static std::vector<HANDLE> list_all_raw_input_devices_of_type(int rimType) {
     return ret;
 }
 
+static BOOL get_hiddevice_info(HANDLE hDevice, RID_DEVICE_INFO *deviceInfo, char** deviceName) {
+    RID_DEVICE_INFO deviceInfoBuffer;
+    UINT cbSize = deviceInfoBuffer.cbSize = sizeof(RID_DEVICE_INFO);
+    if(GetRawInputDeviceInfoA(hDevice, RIDI_DEVICEINFO, &deviceInfoBuffer, &cbSize)==-1) return FALSE;
 
+    GetRawInputDeviceInfoA(hDevice, RIDI_DEVICENAME, NULL, &cbSize);
+    if (cbSize <= 0) return FALSE;
+    char *nameBuffer = (char*)malloc(cbSize);
+    if (!nameBuffer) return FALSE;
+    if (GetRawInputDeviceInfoA(hDevice, RIDI_DEVICENAME, nameBuffer, &cbSize) == -1) {
+        free(nameBuffer);
+        return FALSE;
+    };
+    *deviceInfo = deviceInfoBuffer;
+    *deviceName = nameBuffer;
+
+    
+
+    return TRUE;
+}
 
 
 extern "C" {
@@ -309,6 +316,24 @@ extern "C" {
             return native_array_t::make(tracker->get_active_mice());
         else
             return native_array_t::empty();
+    }
+
+
+    BOOL DLL_EXPORT GetMouseInfo(MouseHandle mouse, mouse_info_t* out) {
+        char* name;
+        RID_DEVICE_INFO info;
+        auto ret = get_hiddevice_info(mouse, &info, &name);
+        if (!ret || info.dwType != RIM_TYPEMOUSE) return FALSE;
+        
+        out->id = info.mouse.dwId;
+        out->numberOfButtons = info.mouse.dwNumberOfButtons;
+        out->sampleRate = info.mouse.dwSampleRate;
+        out->hasHorizontalWheel = !!(info.mouse.fHasHorizontalWheel);
+        out->name = name;
+
+        DEBUGLOG("Mouse info({2}): {0}'{1}'", pp(name), ss(name), ii(out->id));
+
+        return TRUE;
     }
 }
 

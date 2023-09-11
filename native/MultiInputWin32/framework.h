@@ -15,6 +15,14 @@ struct mouse_state_t {
 	bool was_absolute = false;
 };
 
+struct mouse_info_t {
+	int32_t id;
+	int32_t numberOfButtons;
+	int32_t sampleRate;
+	bool hasHorizontalWheel;
+	const char* name;
+};
+
 class input_tracker_t;
 
 
@@ -32,4 +40,6 @@ extern "C" {
 
 	native_array_t DLL_EXPORT GetAvailableDevicesOfType(input_tracker_t* tracker, int deviceType);
 	native_array_t DLL_EXPORT GetActiveDevicesOfType(input_tracker_t* tracker, int deviceType);
+
+	BOOL DLL_EXPORT GetMouseInfo(MouseHandle mouse, mouse_info_t* out);
 }
