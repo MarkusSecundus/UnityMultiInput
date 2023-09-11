@@ -73,11 +73,21 @@ public class MultiInputManager : MonoBehaviour
     }
 
 
-
+    public Texture2D cursorTexture;
+    public Camera otherCamera;
     volatile IntPtr inputReaderHandle = IntPtr.Zero;
+    public TMP_Text numOfDisplaysLbl;
 
     public void Start()
     {
+        try
+        {
+            numOfDisplaysLbl.text = ($"Displays: ({Display.displays.Length})[{Display.displays.MakeString()}]");
+            foreach (var c in Camera.allCameras)
+                Debug.Log($"cam...{c.pixelWidth}x{c.pixelHeight}");
+        }
+        catch { }
+
         Cursor.lockState = CursorLockMode.Locked;
         new Thread(() =>
         {
@@ -118,11 +128,11 @@ public class MultiInputManager : MonoBehaviour
 
             var cursor = Instantiate(debugPrototype);
             cursor.transform.SetParent(debugPrototype.transform.parent);
-            cursor.gameObject.SetActive(true);
+            //cursor.gameObject.SetActive(true);
             cursor.color = CursorColors[mice.Count%CursorColors.Length];
             cursor.rectTransform.position = new Vector2(UnityEngine.Random.Range(100, Camera.main.scaledPixelWidth / 2), UnityEngine.Random.Range(100, Camera.main.scaledPixelHeight / 2));
 
-            ret = new Mouse { Cursor = cursor };
+            ret = new Mouse { inputManager = this, Cursor = cursorTexture };
 
             mice[h] = ret;
             return ret;
@@ -131,11 +141,13 @@ public class MultiInputManager : MonoBehaviour
 
     static Color[] CursorColors = new[] {Color.white, Color.red, Color.yellow, Color.blue, Color.green, Color.cyan, Color.magenta};
 
-
+    public Vector2 axisScale = default;
     class Mouse : IMouse
     {
-        Vector2 position;
-        public Vector2 Position { get => position; set => position = value.Clamp(Config.ScreenBoundary); }
+        internal MultiInputManager inputManager;
+
+        Vector2 _position;
+        public Vector2 Position { get => _position; set => _position = value.Clamp(Config.ScreenBoundary); }
 
         public float ScrollDelta { get; set; }
 
@@ -157,29 +169,40 @@ public class MultiInputManager : MonoBehaviour
 
         public IMouse.Configuration Config { get; set; } = IMouse.Configuration.Default;
 
-        public Image Cursor { get; set; }
+        public bool ShouldDrawCursor { get; set; } = true;
+        public Image CursorImage { get; set; }
+        public Texture2D Cursor { get; set; }
 
         internal void UpdateState(MouseInputFrame frame)
         {
-            Position += new Vector2(frame.x * Config.MouseSpeed.x, frame.y * Config.MouseSpeed.y);
-            
-            var axesRaw = new Vector2(frame.x * Config.AxisScale.x, frame.y * Config.AxisScale.y).Clamp(-1f, 1f);
-            Axes = Vector2.Lerp(AxesRaw/*from last frame*/, axesRaw, 0.6f);
-            AxesRaw = axesRaw;
+            ProcessMovement();
+            ProcessScroll();
+            ProcessKeys();
 
 
-            ScrollDelta = frame.mainScroll * Config.ScrollSpeed;
+            void ProcessMovement()
+            {
+                Position += new Vector2(frame.x * Config.MouseSpeed.x, frame.y * Config.MouseSpeed.y);
 
-            foreach (var keycode in MouseKeyCodeHelpers.AllMouseKeyCodes)
-                if (GetButtonUp(keycode))
-                    buttonFlags &= ~keycode.GetButtonPressedFlag();
-            buttonFlags &= ~(MouseButtonPressFlags.RI_MOUSE_BUTTON_UP_DOWN_BLOCK);
-            buttonFlags |= (frame.buttonFlags & MouseButtonPressFlags.RI_MOUSE_BUTTON_UP_DOWN_BLOCK);
-            foreach (var keycode in MouseKeyCodeHelpers.AllMouseKeyCodes)
-                if (GetButtonDown(keycode))
-                    buttonFlags |= keycode.GetButtonPressedFlag();
-
-            Cursor.rectTransform.position = Position;
+                var axesRaw = new Vector2(frame.x * Config.AxisScale.x, frame.y * Config.AxisScale.y).Clamp(-1f, 1f);
+                Axes = Vector2.Lerp(AxesRaw/*from last frame*/, axesRaw, 0.6f);
+                AxesRaw = axesRaw;
+            }
+            void ProcessScroll()
+            {
+                ScrollDelta = frame.mainScroll * Config.ScrollSpeed;
+            }
+            void ProcessKeys()
+            {
+                foreach (var keycode in MouseKeyCodeHelpers.AllMouseKeyCodes)
+                    if (GetButtonUp(keycode))
+                        buttonFlags &= ~keycode.GetButtonPressedFlag();
+                buttonFlags &= ~(MouseButtonPressFlags.RI_MOUSE_BUTTON_UP_DOWN_BLOCK);
+                buttonFlags |= (frame.buttonFlags & MouseButtonPressFlags.RI_MOUSE_BUTTON_UP_DOWN_BLOCK);
+                foreach (var keycode in MouseKeyCodeHelpers.AllMouseKeyCodes)
+                    if (GetButtonDown(keycode))
+                        buttonFlags |= keycode.GetButtonPressedFlag();
+            }
         }
     }
 
