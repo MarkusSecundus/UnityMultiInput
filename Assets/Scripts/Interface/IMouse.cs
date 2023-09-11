@@ -29,6 +29,6 @@ public interface IMouse
 
         private static Rect BoundaryFromCamera(Camera cam) => new Rect(new Vector2(0, 0), new Vector2(cam.pixelWidth, cam.pixelHeight));
 
-        public static Configuration Default = new Configuration { ScreenBoundary = BoundaryFromCamera(Camera.main), MouseSpeed = new Vector2(1, -1), AxisScale = new Vector2(50f, -50f), ScrollSpeed = 1f/120f };
+        public static Configuration Default = new Configuration { ScreenBoundary = BoundaryFromCamera(Camera.main), MouseSpeed = new Vector2(1, -1), AxisScale = new Vector2(0.12f, -0.12f), ScrollSpeed = 1f/120f };
     }
 }
