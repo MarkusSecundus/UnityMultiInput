@@ -6,6 +6,12 @@ using UnityEngine;
 
 namespace MarkusSecundus.Utils.Native
 {
+    public static class NativeUtils
+    {
+        public const string MainDllPath = "MultiInputWin32.dll";
+    }
+
+
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void NativeDestructor(IntPtr toFree);
 
@@ -47,4 +53,54 @@ namespace MarkusSecundus.Utils.Native
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void NativeWstringAction([MarshalAs(UnmanagedType.LPTStr)] string s);
+
+
+
+    class NativeDebugEnvironment : IDisposable
+    {
+        internal static class Native
+        {
+            public const string DllPath = NativeUtils.MainDllPath;
+            [DllImport(DllPath)]
+            public static extern void InitDebug(NativeAction<string> format, NativeAction<long> integer, NativeAction<IntPtr> pointer, NativeAction<double> floating, NativeAction<string> cstring, NativeWstringAction wstring, NativeAction flush);
+            [DllImport(DllPath)]
+            public static extern void DestroyDebug();
+        }
+
+        NativeAction<string> format;
+        NativeAction<long> integer;
+        NativeAction<IntPtr> pointer;
+        NativeAction<double> floating;
+        NativeAction<string> cstring;
+        NativeWstringAction wstring;
+        NativeAction flush, silentFlush;
+        string formatString = "";
+        List<object> args = new List<object>();
+        public NativeDebugEnvironment()
+        {
+            Native.InitDebug(
+                 format = s => formatString = s,
+                 integer = i => args.Add(i),
+                 pointer = p => args.Add(p),
+                 floating = d => args.Add(d),
+                 cstring = s => args.Add(s),
+                 wstring = s => args.Add(s),
+                 flush = () =>
+                 {
+                     try
+                     {
+                         Debug.Log("native: " + string.Format(formatString, args.ToArray()));
+                     }
+                     catch
+                     {
+                         Debug.LogError($"Error during native debug... '{formatString}', args: [{args.MakeString()}]");
+                     }
+                     formatString = "";
+                     args.Clear();
+                 }
+            );
+        }
+
+        public void Dispose() => Native.DestroyDebug();
+    }
 }

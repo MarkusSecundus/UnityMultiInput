@@ -12,91 +12,44 @@ using TMPro;
 
 
 using MouseHandle = System.IntPtr;
-using EnvHandle = System.IntPtr;
 using InputHandle = System.IntPtr;
 using UnityEngine.UI;
 using System.Net;
 
 #if PLATFORM_STANDALONE_WIN
 
-public enum RIM_DEVICETYPE : int
-{
-    MOUSE=0, KEYBOARD=1, HID=2
-}
 
 public class MultiInputManager : MonoBehaviour
 {
-    [DllImport("MultiInputWin32.dll")]
-    public static extern InputHandle InitInputHandle();
-    [DllImport("MultiInputWin32.dll")]
-    public static extern int RunInputInfiniteLoop(InputHandle input);
-    [DllImport("MultiInputWin32.dll")]
-    public static extern int StopInputInfiniteLoop(InputHandle input);
+    internal static class Native
+    {
+        public const string DllPath = NativeUtils.MainDllPath;
+        [DllImport(DllPath)]
+        public static extern InputHandle InitInputHandle();
+        [DllImport(DllPath)]
+        public static extern int RunInputInfiniteLoop(InputHandle input);
+        [DllImport(DllPath)]
+        public static extern int StopInputInfiniteLoop(InputHandle input);
 
 
 
-    [DllImport("MultiInputWin32.dll")]
-    public static extern EnvHandle InitDebug(NativeAction<string> format, NativeAction<long> integer, NativeAction<IntPtr> pointer, NativeAction<double> floating, NativeAction<string> cstring, NativeWstringAction wstring, NativeAction flush);
-    [DllImport("MultiInputWin32.dll")]
-    public static extern void DestroyDebug();
+        [DllImport(DllPath)]
+        public static extern MouseInputFrame ConsumeMouseState(InputHandle tracker, MouseHandle mouseHandle);
 
 
-    
-    [DllImport("MultiInputWin32.dll")]
-    public static extern MouseInputFrame ConsumeMouseState(InputHandle tracker, MouseHandle mouseHandle);
-
-    
-    [DllImport("MultiInputWin32.dll")]
-    public static extern NativeArray<MouseHandle> GetAvailableDevicesOfType(InputHandle tracker, RIM_DEVICETYPE deviceType);
-    [DllImport("MultiInputWin32.dll")]
-    public static extern NativeArray<MouseHandle> GetActiveDevicesOfType(InputHandle tracker, RIM_DEVICETYPE deviceType);
-    [DllImport("MultiInputWin32.dll")]
-    public static extern int GetMouseInfo(MouseHandle mouse, out MouseInfo info);
+        [DllImport(DllPath)]
+        public static extern NativeArray<MouseHandle> GetAvailableDevicesOfType(InputHandle tracker, RIM_DEVICETYPE deviceType);
+        [DllImport(DllPath)]
+        public static extern NativeArray<MouseHandle> GetActiveDevicesOfType(InputHandle tracker, RIM_DEVICETYPE deviceType);
+        [DllImport(DllPath)]
+        public static extern int GetMouseInfo(MouseHandle mouse, out MouseInfo info);
+    }
 
 
     public Image debugPrototype;
-    public Vector2 speedMultiplier;
 
-    Dictionary<MouseHandle, Mouse> debuggersForMice = new();
+    Dictionary<MouseHandle, Mouse> mice = new();
 
-    class NativeDebugManager : IDisposable
-    {
-        NativeAction<string> format;
-        NativeAction<long> integer;
-        NativeAction<IntPtr> pointer;
-        NativeAction<double> floating;
-        NativeAction<string> cstring;
-        NativeWstringAction wstring;
-        NativeAction flush, silentFlush;
-        string formatString = "";
-        List<object> args = new List<object>();
-        public NativeDebugManager()
-        {
-            InitDebug(
-                 format = s => formatString = s,
-                 integer = i => args.Add(i),
-                 pointer = p => args.Add(p),
-                 floating = d => args.Add(d),
-                 cstring = s => args.Add(s),
-                 wstring = s => args.Add(s),
-                 flush = () =>
-                 {
-                    try
-                    {
-                        Debug.Log("native: " + string.Format(formatString, args.ToArray()));
-                    }
-                    catch
-                    {
-                        Debug.LogError($"Error during native debug... '{formatString}', args: [{args.MakeString()}]");
-                    }
-                    formatString = "";
-                    args.Clear();
-                 }
-            );
-        }
-
-        public void Dispose() => DestroyDebug();
-    }
     [StructLayout(LayoutKind.Sequential)]
     public struct MouseInputFrame
     {
@@ -122,23 +75,20 @@ public class MultiInputManager : MonoBehaviour
 
 
     volatile IntPtr inputReaderHandle = IntPtr.Zero;
-    volatile NativeDebugManager dbg = null;
 
     public void Start()
     {
         Cursor.lockState = CursorLockMode.Locked;
         new Thread(() =>
         {
-            dbg = new();
+            using var dbg = new NativeDebugEnvironment();
             Debug.Log("Starting new thread for win32 coop", this);
 
-            var inputReaderHandle = this.inputReaderHandle = InitInputHandle();
+            var inputReaderHandle = this.inputReaderHandle = Native.InitInputHandle();
             if (inputReaderHandle == IntPtr.Zero) return;
             Debug.Log($"Created input window({inputReaderHandle})", this);
 
-            var ret = RunInputInfiniteLoop(inputReaderHandle);
-
-            dbg.Dispose(); dbg = null;
+            var ret = Native.RunInputInfiniteLoop(inputReaderHandle);
 
             Debug.Log($"Ending win32 coop thread (ret: {ret})", this);
         }).Start();
@@ -148,10 +98,10 @@ public class MultiInputManager : MonoBehaviour
     {
         if (inputReaderHandle != IntPtr.Zero)
         {
-            var arr = GetActiveDevicesOfType(inputReaderHandle, RIM_DEVICETYPE.MOUSE).Consume();
+            var arr = Native.GetActiveDevicesOfType(inputReaderHandle, RIM_DEVICETYPE.MOUSE).Consume();
             foreach (var handle in arr)
             {
-                var state = ConsumeMouseState(inputReaderHandle, handle);
+                var state = Native.ConsumeMouseState(inputReaderHandle, handle);
                 getMouse(handle).UpdateState(state);
             }
 
@@ -159,9 +109,9 @@ public class MultiInputManager : MonoBehaviour
 
         Mouse getMouse(MouseHandle h)
         {
-            if (debuggersForMice.TryGetValue(h, out var ret)) return ret;
+            if (mice.TryGetValue(h, out var ret)) return ret;
 
-            if (GetMouseInfo(h, out var info) == 0) Debug.Log($"Could not get info for mouse {h}", this);
+            if (Native.GetMouseInfo(h, out var info) == 0) Debug.Log($"Could not get info for mouse {h}", this);
             else Debug.Log($"m{h}:::{info}", this);
             Debug.Log($"Cam({Camera.main.pixelWidth}x{Camera.main.pixelHeight}), SCam({Camera.main.scaledPixelWidth}x{Camera.main.scaledPixelHeight}), Scr({Screen.width}x{Screen.height})", this);
 
@@ -169,12 +119,12 @@ public class MultiInputManager : MonoBehaviour
             var cursor = Instantiate(debugPrototype);
             cursor.transform.SetParent(debugPrototype.transform.parent);
             cursor.gameObject.SetActive(true);
-            cursor.color = CursorColors[debuggersForMice.Count%CursorColors.Length];
+            cursor.color = CursorColors[mice.Count%CursorColors.Length];
             cursor.rectTransform.position = new Vector2(UnityEngine.Random.Range(100, Camera.main.scaledPixelWidth / 2), UnityEngine.Random.Range(100, Camera.main.scaledPixelHeight / 2));
 
             ret = new Mouse { Cursor = cursor };
 
-            debuggersForMice[h] = ret;
+            mice[h] = ret;
             return ret;
         }
     }
@@ -237,7 +187,7 @@ public class MultiInputManager : MonoBehaviour
     {
         var inputReaderHandle = this.inputReaderHandle;
         Debug.Log($"Stopping the input window({inputReaderHandle})", this);
-        var ret = StopInputInfiniteLoop(inputReaderHandle);
+        var ret = Native.StopInputInfiniteLoop(inputReaderHandle);
         Debug.Log($"Window stopping result: {ret}", this);
         Cursor.lockState = CursorLockMode.None;
     }
@@ -277,4 +227,10 @@ public static class MouseButtonPressFlagsHelpers
     public static MouseButtonPressFlags GetButtonUpFlag(this MouseKeyCode code) => (MouseButtonPressFlags)(1 << (code.AsMouseKeyIndex() * 2 + 1));
     public static MouseButtonPressFlags GetButtonPressedFlag(this MouseKeyCode code) => (MouseButtonPressFlags)(1 << (code.AsMouseKeyIndex() +20));
 }
+
+public enum RIM_DEVICETYPE : int
+{
+    MOUSE = 0, KEYBOARD = 1, HID = 2
+}
+
 #endif
