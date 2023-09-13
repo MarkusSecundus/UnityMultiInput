@@ -39,7 +39,6 @@ public partial class MultiInputManagerWin32 : MonoBehaviour
     static readonly Color[] CursorColors = new[] { Color.red, Color.yellow, Color.blue, Color.green, Color.cyan, Color.magenta };
 
 
-    const string PathToCursorPrefabResource = "OpenMultiInput/MultiMouseCursor";
     Dictionary<DisplayIdentifier, Canvas> _canvasPerDisplay = new Dictionary<DisplayIdentifier, Canvas>();
     Canvas _getCanvasForDisplay(DisplayIdentifier targetDisplay)
     {
@@ -59,7 +58,7 @@ public partial class MultiInputManagerWin32 : MonoBehaviour
     Image _createMouseCursor(Camera cam, int cursorId, Texture texture, Color color)
     {
         var canvas = _getCanvasForDisplay(cam.targetDisplay);
-        var cursor = Resources.Load(PathToCursorPrefabResource).GetComponent<Image>();
+        var cursor = Resources.Load(ResourcePaths.CursorPrefab).GetComponent<Image>();
         cursor = GameObject.Instantiate(cursor);
         cursor.rectTransform.SetParent(canvas.transform, false);
         cursor.rectTransform.localPosition = Vector3.zero;
@@ -156,7 +155,7 @@ public partial class MultiInputManagerWin32 : MonoBehaviour
                 Debug.DrawRay(ray.origin - ray.direction * 2, ray.direction * 10, CursorColor);
             }
             
-            CursorObject.rectTransform.position = ScreenPosition + new Vector2(CursorObject.rectTransform.sizeDelta.x, -CursorObject.rectTransform.sizeDelta.y)*0.5f;
+            CursorObject.rectTransform.position = ScreenPosition;
             return;
         }
     }
