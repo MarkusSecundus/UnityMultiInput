@@ -15,12 +15,11 @@ using MouseHandle = System.IntPtr;
 using InputHandle = System.IntPtr;
 using UnityEngine.UI;
 using System.Net;
-using static MultiInputManagerWin32.Native;
 
 #if PLATFORM_STANDALONE_WIN
 
 
-public partial class MultiInputManagerWin32 : MonoBehaviour
+internal partial class MultiInputManagerWin32 : MonoBehaviour
 {
     internal static class Native
     {
@@ -105,9 +104,9 @@ public partial class MultiInputManagerWin32 : MonoBehaviour
 }
 internal static class MultiInputManagerWin32_Native_MouseButtonPressFlagsHelpers
 {
-    internal static MultiInputManagerWin32.Native.MouseButtonPressFlags GetButtonDownFlag(this MouseKeyCode code) => (MouseButtonPressFlags)(1 << (code.AsMouseKeyIndex() * 2));
-    internal static MultiInputManagerWin32.Native.MouseButtonPressFlags GetButtonUpFlag(this MouseKeyCode code) => (MouseButtonPressFlags)(1 << (code.AsMouseKeyIndex() * 2 + 1));
-    internal static MultiInputManagerWin32.Native.MouseButtonPressFlags GetButtonPressedFlag(this MouseKeyCode code) => (MouseButtonPressFlags)(1 << (code.AsMouseKeyIndex() + 20));
+    internal static MultiInputManagerWin32.Native.MouseButtonPressFlags GetButtonDownFlag(this MouseKeyCode code) => (MultiInputManagerWin32.Native.MouseButtonPressFlags)(1 << (code.AsMouseKeyIndex() * 2));
+    internal static MultiInputManagerWin32.Native.MouseButtonPressFlags GetButtonUpFlag(this MouseKeyCode code) => (MultiInputManagerWin32.Native.MouseButtonPressFlags)(1 << (code.AsMouseKeyIndex() * 2 + 1));
+    internal static MultiInputManagerWin32.Native.MouseButtonPressFlags GetButtonPressedFlag(this MouseKeyCode code) => (MultiInputManagerWin32.Native.MouseButtonPressFlags)(1 << (code.AsMouseKeyIndex() + 20));
 }
 
 

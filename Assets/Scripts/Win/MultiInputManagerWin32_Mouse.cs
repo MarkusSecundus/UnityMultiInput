@@ -11,28 +11,29 @@ using System.Resources;
 using Unity.VisualScripting;
 
 #if PLATFORM_STANDALONE_WIN
-public partial class MultiInputManagerWin32 : MonoBehaviour
+internal partial class MultiInputManagerWin32 : MonoBehaviour
 {
 
-    Dictionary<MouseHandle, Mouse> _mice = new();
+    Dictionary<MouseHandle, Mouse> _activeMice = new();
     Mouse _getOrCreateMouse(MouseHandle h)
     {
-        if (_mice.TryGetValue(h, out var ret)) return ret;
+        if (_activeMice.TryGetValue(h, out var ret)) return ret;
 
         if (Native.GetMouseInfo(h, out var info) == 0) Debug.Log($"Could not get info for mouse {h}", this);
         else Debug.Log($"m{h}:::{info}", this);
         Debug.Log($"Cam({Camera.main.pixelWidth}x{Camera.main.pixelHeight}), SCam({Camera.main.scaledPixelWidth}x{Camera.main.scaledPixelHeight}), Scr({Screen.width}x{Screen.height})", this);
 
 
-        var color = CursorColors[_mice.Count % CursorColors.Length];
-        var cam = Camera.allCameras[_mice.Count % Camera.allCameras.Length];
+        var color = CursorColors[_activeMice.Count % CursorColors.Length];
+        var cam = Camera.allCameras[_activeMice.Count % Camera.allCameras.Length];
         var cursor = _createMouseCursor(cam, -1, null, color);
 
 
         ret = new Mouse { _inputManager = this, CursorObject = cursor, CursorColor = color };
         ret.Config.TargetCamera = cam;
         
-        _mice[h] = ret;
+        _activeMice[h] = ret;
+        OnMouseActivated?.Invoke(ret);
         return ret;
 
     }
@@ -78,7 +79,7 @@ public partial class MultiInputManagerWin32 : MonoBehaviour
         public Vector2 ScreenPosition => Config.TargetCamera.ViewportToScreenPoint(ViewportPositionNormalized);
         public Ray WorldPositionRay => Config.TargetCamera.ScreenPointToRay(ScreenPosition);
 
-        public float ScrollDelta { get; private set; }
+        public Vector2 ScrollDelta { get; private set; }
 
         public Vector2 Axes { get; private set; }
         public Vector2 AxesRaw { get; private set; }
@@ -92,13 +93,23 @@ public partial class MultiInputManagerWin32 : MonoBehaviour
 
         public bool GetButtonUp(MouseKeyCode buttonNumber) => (int)(buttonFlags & buttonNumber.GetButtonUpFlag()) != 0;
 
-        public bool IsButtonDown => (int)(buttonFlags & Native.MouseButtonPressFlags.RI_MOUSE_BUTTON_DOWN_BLOCK) != 0;
-        public bool IsButtonUp => (int)(buttonFlags & Native.MouseButtonPressFlags.RI_MOUSE_BUTTON_UP_BLOCK) != 0;
-        public bool IsButtonPressed => (int)(buttonFlags & Native.MouseButtonPressFlags.RI_MOUSE_BUTTON_PRESSED_BLOCK) != 0;
+        public bool IsAnyButtonDown => (int)(buttonFlags & Native.MouseButtonPressFlags.RI_MOUSE_BUTTON_DOWN_BLOCK) != 0;
+        public bool IsAnyButtonUp => (int)(buttonFlags & Native.MouseButtonPressFlags.RI_MOUSE_BUTTON_UP_BLOCK) != 0;
+        public bool IsAnyButtonPressed => (int)(buttonFlags & Native.MouseButtonPressFlags.RI_MOUSE_BUTTON_PRESSED_BLOCK) != 0;
 
-        public IMouse.Configuration Config { get; set; } = IMouse.Configuration.Default;
+        public IMouse.IConfiguration Config { get; } = Configuration.MakeDefault();
+        internal class Configuration : IMouse.IConfiguration
+        {
+            DisplayUtils.SafeCameraBinding _targetCamera;
+            public Camera TargetCamera { get => _targetCamera.Value; set => _targetCamera.Value = value; }
+            public Vector2 MouseSpeed { get; set; }
+            public Vector2 AxisScale { get; set; }
+            public float ScrollSpeed { get; set; }
 
-        public bool ShouldDrawCursor { get; set; } = true;
+            public static Configuration MakeDefault() => new Configuration { TargetCamera = Camera.main, MouseSpeed = new Vector2(1, -1), AxisScale = new Vector2(0.12f, -0.12f), ScrollSpeed = 1f / 120f };
+        }
+
+        public bool ShouldDrawCursor { get => CursorObject.gameObject.activeSelf; set => CursorObject.gameObject.SetActive(value); }
         internal Image CursorObject { get; set; }
         public Texture Cursor { get => CursorObject.mainTexture; set => CursorObject.material.mainTexture = value; }
         public Color CursorColor { get => CursorObject.color; set => CursorObject.color = value;}
@@ -121,7 +132,7 @@ public partial class MultiInputManagerWin32 : MonoBehaviour
             }
             void ProcessScroll()
             {
-                ScrollDelta = frame.MainScroll * Config.ScrollSpeed;
+                ScrollDelta = new Vector2(frame.MainScroll, frame.HorizontalScroll) * Config.ScrollSpeed;
             }
             void ProcessKeys()
             {
@@ -134,30 +145,28 @@ public partial class MultiInputManagerWin32 : MonoBehaviour
                     if (GetButtonDown(keycode))
                         buttonFlags |= keycode.GetButtonPressedFlag();
             }
-            void SetCursor() => DrawCursor();
+            void SetCursor()
+            {
+                if (!ShouldDrawCursor) return;
+
+                var cam = Config.TargetCamera;
+                if (CursorObject.canvas.targetDisplay == cam.targetDisplay)
+                {
+                    var newCanvas = _inputManager._getCanvasForDisplay(cam.targetDisplay);
+                    CursorObject.transform.SetParent(newCanvas.transform, false);
+                }
+
+                /*{
+                    var ray = WorldPositionRay;
+                    Debug.DrawRay(ray.origin - ray.direction * 2, ray.direction * 10, CursorColor);
+                }*/
+
+                CursorObject.rectTransform.position = ScreenPosition;
+                return;
+            }
         }
 
-        /// <summary>
-        /// Draws the cursor representing the onscreen position of the mouse. Must be called from OnGUI message handler of some <see cref="UnityEngine.Component"/>
-        /// </summary>
-        internal void DrawCursor()
-        {
-            if (!ShouldDrawCursor) return;
-
-            if(CursorObject.canvas.targetDisplay == Config.TargetCamera.targetDisplay)
-            {
-                var newCanvas = _inputManager._getCanvasForDisplay(Config.TargetCamera.targetDisplay);
-                CursorObject.transform.SetParent(newCanvas.transform, false);
-            }
-
-            {
-                var ray = WorldPositionRay;
-                Debug.DrawRay(ray.origin - ray.direction * 2, ray.direction * 10, CursorColor);
-            }
-            
-            CursorObject.rectTransform.position = ScreenPosition;
-            return;
-        }
+        
     }
 }
 

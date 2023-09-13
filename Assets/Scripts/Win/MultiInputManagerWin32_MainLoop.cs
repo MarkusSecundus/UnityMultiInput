@@ -19,7 +19,7 @@ using static MultiInputManagerWin32;
 using System.Runtime.InteropServices.WindowsRuntime;
 
 #if PLATFORM_STANDALONE_WIN
-public partial class MultiInputManagerWin32 : MonoBehaviour
+internal partial class MultiInputManagerWin32 : MonoBehaviour
 {
     static MultiInputManagerWin32 _Instance { get; set; }
 

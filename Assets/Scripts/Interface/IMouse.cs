@@ -5,7 +5,7 @@ using UnityEngine;
 public interface IMouse
 {
     public Vector2 ViewportPosition { get; }
-    public float ScrollDelta { get; }
+    public Vector2 ScrollDelta { get; }
 
     public Vector2 Axes { get; }
     public Vector2 AxesRaw { get; }
@@ -13,21 +13,17 @@ public interface IMouse
     public bool GetButton(MouseKeyCode buttonNumber);
     public bool GetButtonDown(MouseKeyCode buttonNumber);
     public bool GetButtonUp(MouseKeyCode buttonNumber);
-    public bool IsButtonDown { get; }
-    public bool IsButtonUp { get; }
-    public bool IsButtonPressed { get; }
+    public bool IsAnyButtonDown { get; }
+    public bool IsAnyButtonUp { get; }
+    public bool IsAnyButtonPressed { get; }
 
-    public Configuration Config { get; set; }
+    public IConfiguration Config { get; }
 
-    [System.Serializable]
-    public class Configuration
+    public interface IConfiguration
     {
-        public Camera TargetCamera;
-        public Vector2 MouseSpeed;
-        public Vector2 AxisScale;
-        public float ScrollSpeed;
-
-
-        public static Configuration Default => new Configuration { TargetCamera = Camera.main, MouseSpeed = new Vector2(1, -1), AxisScale = new Vector2(0.12f, -0.12f), ScrollSpeed = 1f/120f };
+        public Camera TargetCamera { get; set; }
+        public Vector2 MouseSpeed { get; set; }
+        public Vector2 AxisScale { get; set; }
+        public float ScrollSpeed { get; set; }
     }
 }
