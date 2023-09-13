@@ -4,7 +4,7 @@ using UnityEngine;
 
 public interface IMouse
 {
-    public Vector2 Position { get; }
+    public Vector2 ViewportPosition { get; }
     public float ScrollDelta { get; }
 
     public Vector2 Axes { get; }
@@ -20,15 +20,14 @@ public interface IMouse
     public Configuration Config { get; set; }
 
     [System.Serializable]
-    public struct Configuration
+    public class Configuration
     {
-        public Rect ScreenBoundary;
+        public Camera TargetCamera;
         public Vector2 MouseSpeed;
         public Vector2 AxisScale;
         public float ScrollSpeed;
 
-        private static Rect BoundaryFromCamera(Camera cam) => new Rect(new Vector2(0, 0), new Vector2(cam.pixelWidth, cam.pixelHeight));
 
-        public static Configuration Default = new Configuration { ScreenBoundary = BoundaryFromCamera(Camera.main), MouseSpeed = new Vector2(1, -1), AxisScale = new Vector2(0.12f, -0.12f), ScrollSpeed = 1f/120f };
+        public static Configuration Default => new Configuration { TargetCamera = Camera.main, MouseSpeed = new Vector2(1, -1), AxisScale = new Vector2(0.12f, -0.12f), ScrollSpeed = 1f/120f };
     }
 }
