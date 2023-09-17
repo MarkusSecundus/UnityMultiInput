@@ -4,12 +4,19 @@
 #include<stdio.h>
 #include<memory>
 #include<unordered_map>
+#include<unordered_set>
 #include<vector>
 
 #include"framework.h"
 
 static volatile HMODULE MainHModule;
 
+
+struct keyboard_state_internal_t {
+    using VirtualKeyCode = USHORT;
+
+    std::unordered_set<VirtualKeyCode> pressed_down, pressed_up;
+};
 
 class input_tracker_t {
 public:
@@ -60,7 +67,7 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
 
     if (raw->header.dwType == RIM_TYPEKEYBOARD)
     {
-        /*DEBUGLOG("Kbd({6}): make={0} Flags:{1} Reserved:{2} ExtraInformation:{3}, msg={4} VK={5} \n",
+        DEBUGLOG("Kbd({6}): make={0} Flags:{1} Reserved:{2} ExtraInformation:{3}, msg={4} VK={5} \n",
             ii(raw->data.keyboard.MakeCode),
             ii(raw->data.keyboard.Flags),
             ii(raw->data.keyboard.Reserved),
@@ -68,7 +75,7 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
             ii(raw->data.keyboard.Message),
             ii(raw->data.keyboard.VKey),
             pp(raw->header.hDevice)
-        );*/
+        );
 
     }
     else if (raw->header.dwType == RIM_TYPEMOUSE)
@@ -205,31 +212,24 @@ static BOOL stop_window(HWND window) {
     return SendMessageW(window, WM_CLOSE, 0, 0);
 }
 
-
+#define HID_USAGE_PAGE__GENERIC_DESKTOP 0x0001
+#define HID_USAGE_POINTER 0x0001
+#define HID_USAGE_MOUSE 0x0002
+#define HID_USAGE_KEYBOARD 0x0006
 
 
 static BOOL register_for_raw_input(HMODULE hModule, HWND window) {
-#if 1
     RAWINPUTDEVICE deviceDefinitions[2];
 
     deviceDefinitions[0].dwFlags = 0;
-    deviceDefinitions[0].usUsagePage = 0x0001;
-    deviceDefinitions[0].usUsage = 0x0002;
+    deviceDefinitions[0].usUsagePage = HID_USAGE_PAGE__GENERIC_DESKTOP;
+    deviceDefinitions[0].usUsage = HID_USAGE_MOUSE;
     deviceDefinitions[0].hwndTarget = window;
 
     deviceDefinitions[1].dwFlags = 0;
-    deviceDefinitions[1].usUsagePage = 0x0001;
-    deviceDefinitions[1].usUsage = 0x0002;
+    deviceDefinitions[1].usUsagePage = HID_USAGE_PAGE__GENERIC_DESKTOP;
+    deviceDefinitions[1].usUsage = HID_USAGE_KEYBOARD;
     deviceDefinitions[1].hwndTarget = window;
-#else
-    RAWINPUTDEVICE deviceDefinitions[1];
-
-    deviceDefinitions[0].dwFlags = RIDEV_PAGEONLY;// | RIDEV_EXINPUTSINK;
-    deviceDefinitions[0].usUsagePage = 0x0001;
-    deviceDefinitions[0].usUsage = 0;
-    deviceDefinitions[0].hwndTarget = window;
-
-#endif
 
     if (!RegisterRawInputDevices(deviceDefinitions, ARRAY_LENGTH(deviceDefinitions), sizeof(RAWINPUTDEVICE))) return FALSE;
 
