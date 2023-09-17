@@ -48,3 +48,11 @@ private:
     std::mutex* m;
 };
 
+template<typename TItem>
+using Consumer = void (__stdcall*)(TItem toBeConsumed);
+
+template<typename TCollection, typename TItem>
+void consume_iterable(TCollection &&collection, Consumer<TItem> consumer) {
+    for (auto it = collection.begin(); it != collection.end(); ++it)
+        consumer(*it);
+}

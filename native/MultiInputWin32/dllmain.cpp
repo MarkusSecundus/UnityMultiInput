@@ -27,12 +27,9 @@ public:
     }
     mutex_lock lock() { return mutex_lock(&mut); }
 
-    std::vector<MouseHandle> get_active_mice() {
-        std::vector<MouseHandle> ret;
-        for (const auto& m : mice) {
-            ret.emplace_back(m.first);
-        }
-        return ret;
+    void get_active_mice(Consumer<MouseHandle> pushback) {
+        for (const auto& m : mice)
+            pushback(m.first);
     }
     const HWND window_handle;
 
@@ -238,20 +235,17 @@ static BOOL register_for_raw_input(HMODULE hModule, HWND window) {
 
 
 /// <param name="rimType">Can be either RIM_TYPEMOUSE, RIM_TYPEKEYBOARD, RIM_TYPEHID</param>
-static std::vector<HANDLE> list_all_raw_input_devices_of_type(int rimType) {
+static void list_all_raw_input_devices_of_type(int rimType, Consumer<HANDLE> pushback) {
     UINT numDevices = 0;
-    if (GetRawInputDeviceList(NULL, &numDevices, sizeof(RAWINPUTDEVICELIST)) == -1) return std::vector<HANDLE>{};
+    if (GetRawInputDeviceList(NULL, &numDevices, sizeof(RAWINPUTDEVICELIST)) == -1) return;
 
     auto devices = std::make_unique<RAWINPUTDEVICELIST[]>(numDevices);
-    if(GetRawInputDeviceList(devices.get(), &numDevices, sizeof(RAWINPUTDEVICELIST)) == -1) return std::vector<HANDLE>{};
+    if(GetRawInputDeviceList(devices.get(), &numDevices, sizeof(RAWINPUTDEVICELIST)) == -1) return;
 
-    std::vector<MouseHandle> ret;
     for (int t = 0; t < numDevices; ++t) {
         if (devices[t].dwType == rimType)
-            ret.emplace_back(devices[t].hDevice);
+            pushback(devices[t].hDevice);
     }
-    
-    return ret;
 }
 
 static BOOL get_hiddevice_info(HANDLE hDevice, RID_DEVICE_INFO *deviceInfo, char** deviceName) {
@@ -308,14 +302,14 @@ extern "C" {
         return ret;
     }
 
-    native_array_t DLL_EXPORT GetAvailableDevicesOfType(input_tracker_t* tracker, int deviceType) {
-        return native_array_t::make(list_all_raw_input_devices_of_type(deviceType));
+    void DLL_EXPORT GetAvailableDevicesOfType(input_tracker_t* tracker, int deviceType, Consumer<HANDLE> listPushback) {
+        list_all_raw_input_devices_of_type(deviceType, listPushback);
     }
-    native_array_t DLL_EXPORT GetActiveDevicesOfType(input_tracker_t* tracker, int deviceType) {
+    void DLL_EXPORT GetActiveDevicesOfType(input_tracker_t* tracker, int deviceType, Consumer<HANDLE> listPushback) {
         if (deviceType == RIM_TYPEMOUSE)
-            return native_array_t::make(tracker->get_active_mice());
-        else
-            return native_array_t::empty();
+            tracker->get_active_mice(listPushback);
+        else if (deviceType == RIM_TYPEKEYBOARD)
+            ;
     }
 
 

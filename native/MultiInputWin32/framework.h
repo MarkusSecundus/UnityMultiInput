@@ -8,6 +8,7 @@
 #include "utils.h"
 
 using MouseHandle = HANDLE;
+using KeyboardHandle = HANDLE;
 struct mouse_state_t {
 	int32_t x = 0, y = 0;
 	int32_t main_scroll = 0, horizontal_scroll = 0;
@@ -38,8 +39,8 @@ extern "C" {
 
 	mouse_state_t DLL_EXPORT ConsumeMouseState(input_tracker_t* tracker, MouseHandle mouse);
 
-	native_array_t DLL_EXPORT GetAvailableDevicesOfType(input_tracker_t* tracker, int deviceType);
-	native_array_t DLL_EXPORT GetActiveDevicesOfType(input_tracker_t* tracker, int deviceType);
+	void DLL_EXPORT GetAvailableDevicesOfType(input_tracker_t* tracker, int deviceType, Consumer<HANDLE> listPushback);
+	void DLL_EXPORT GetActiveDevicesOfType(input_tracker_t* tracker, int deviceType, Consumer<HANDLE> listPushback);
 
 	BOOL DLL_EXPORT GetMouseInfo(MouseHandle mouse, mouse_info_t* out);
 }
