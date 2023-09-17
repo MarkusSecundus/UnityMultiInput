@@ -17,34 +17,37 @@ using UnityEngine.UI;
 using System.Net;
 using static MultiInputManagerWin32;
 using System.Runtime.InteropServices.WindowsRuntime;
+using UnityEngine.EventSystems;
 
 #if PLATFORM_STANDALONE_WIN
 internal partial class MultiInputManagerWin32 : MonoBehaviour
 {
-    static MultiInputManagerWin32 _Instance { get; set; }
+    static MultiInputConfigWin32 _config;
+    static MultiInputConfigWin32 _Config => _config ? _config : _config = Resources.Load<MultiInputConfigWin32>(ResourcePaths.ConfigWin32);
 
+    static MultiInputManagerWin32 _Instance { get; set; }
 
     volatile IntPtr _inputReaderHandle = IntPtr.Zero;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void AutocreateTheInputEnvironment()
     {
+        if (!_Config.IsMultiInputEnabled) return;
         var o = new GameObject("[MultiInput_Win32]");
         GameObject.DontDestroyOnLoad(o);
         MultiInputManagerWin32._Instance = o.AddComponent<MultiInputManagerWin32>();
     }
 
-    private bool IntegrityIsOK() => _Instance && this == _Instance;
+    private bool IntegrityIsOK() => _Config.IsMultiInputEnabled && _Instance && this == _Instance;
     private void EnsureIntegrity()
     {
-        //Debug.Log($"Checking integrity: {this.name}", this);
+        if (!_Config.IsMultiInputEnabled) Destroy(this);
         if (!_Instance) _Instance = this;
         else if (!IntegrityIsOK()) Destroy(this/*.gameObject*/);
     }
 
     private void Awake()
     {
-        //Debug.Log($"Awoken: {this.name}", this);
         EnsureIntegrity();
     }
 

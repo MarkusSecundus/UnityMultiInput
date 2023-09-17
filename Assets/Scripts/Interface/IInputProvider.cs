@@ -7,6 +7,9 @@ public interface IInputProvider
 {
     public IReadOnlyCollection<IMouse> ActiveMice { get; }
 
+    /// <summary>
+    /// Called for each mouse just after it is added to <see cref="ActiveMice"/>
+    /// </summary>
     public event Action<IMouse> OnMouseActivated;
 
     public static IInputProvider Instance =>

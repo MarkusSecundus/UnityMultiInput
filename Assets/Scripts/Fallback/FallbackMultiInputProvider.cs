@@ -14,6 +14,7 @@ public class FallbackMultiInputProvider : IInputProvider
 
     private class Mouse : IMouse
     {
+        public bool IsActive { get; set; }
         private Mouse() { }
         internal static Mouse Instance = new ();
 
@@ -32,6 +33,9 @@ public class FallbackMultiInputProvider : IInputProvider
         public bool IsAnyButtonPressed => MouseKeyCodeHelpers.AllMouseKeyCodes.Any(k => Input.GetKey(k.AsKeyCode()));
 
         public IMouse.IConfiguration Config { get; } = new Configuration();
+        public bool ShouldDrawCursor { get => UnityEngine.Cursor.visible; set => UnityEngine.Cursor.visible = value; }
+        public Texture Cursor { get => throw new NotImplementedException(); set => UnityEngine.Cursor.SetCursor((Texture2D)value,Vector2.zero, CursorMode.Auto); }
+        public Color CursorColor { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
         private class Configuration : IMouse.IConfiguration
         {

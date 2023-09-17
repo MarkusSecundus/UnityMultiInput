@@ -4,6 +4,7 @@ using UnityEngine;
 
 public interface IMouse
 {
+    public bool IsActive { get; set; }
     public Vector2 ViewportPosition { get; }
     public Vector2 ScrollDelta { get; }
 
@@ -18,6 +19,9 @@ public interface IMouse
     public bool IsAnyButtonPressed { get; }
 
     public IConfiguration Config { get; }
+    public bool ShouldDrawCursor { get; set; }
+    public Texture Cursor { get; set; }
+    public Color CursorColor { get; set; }
 
     public interface IConfiguration
     {

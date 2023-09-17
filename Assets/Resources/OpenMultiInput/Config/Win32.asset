@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ef7844172ce8cb4ebbcdf66f8b707dc, type: 3}
+  m_Name: Win32
+  m_EditorClassIdentifier: 
+  IsMultiInputEnabled: 1
+  Mouse:
+    MouseMovementSpeed: {x: 1, y: -1}
+    MouseAxisSpeed: {x: 0.12, y: -0.12}
+    MouseScrollSpeed: {x: 0.008333334, y: 0.008333334}
+    CursorColors:
+    - {r: 1, g: 0, b: 0, a: 1}
+    - {r: 0.9150943, g: 0.51487005, b: 0.040287085, a: 1}
+    - {r: 0.04509308, g: 0.7169812, b: 0.04509308, a: 1}
+    - {r: 0, g: 0.60323477, b: 1, a: 1}
+    - {r: 0.8113208, g: 0.80676293, b: 0.005102546, a: 1}
+  Keyboard:
+    _placeholder: -1

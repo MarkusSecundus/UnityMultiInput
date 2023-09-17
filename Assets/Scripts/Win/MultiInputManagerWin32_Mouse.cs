@@ -29,7 +29,7 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
         var cursor = _createMouseCursor(cam, -1, null, color);
 
 
-        ret = new Mouse { _inputManager = this, CursorObject = cursor, CursorColor = color };
+        ret = new Mouse { _inputManager = this, CursorObject = cursor, CursorColor = color }.Init();
         ret.Config.TargetCamera = cam;
         
         _activeMice[h] = ret;
@@ -51,7 +51,7 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
 
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.targetDisplay = targetDisplay;
-        //TODO: set very high sorting layer (must be first created)
+        
         Debug.Log($"display..{targetDisplay}->{canvas.targetDisplay}");
 
         return _canvasPerDisplay[targetDisplay] = canvas;
@@ -71,9 +71,19 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
 
     class Mouse : IMouse
     {
+        public Mouse Init()
+        {
+            _updateCursorDrawability();
+            return this;
+        }
+
         internal MultiInputManagerWin32 _inputManager;
 
         Vector2 _position;
+
+        bool _isActive = true;
+        public bool IsActive { get => _isActive; set { _isActive = value; _updateCursorDrawability(); } }
+
         public Vector2 ViewportPosition { get => _position.Clamp(Vector2.zero, Config.TargetCamera.PixelWidthHeight()); set => _position = value.Clamp(Vector2.zero, Config.TargetCamera.PixelWidthHeight()); }
         public Vector2 ViewportPositionNormalized => ViewportPosition / Config.TargetCamera.PixelWidthHeight();
         public Vector2 ScreenPosition => Config.TargetCamera.ViewportToScreenPoint(ViewportPositionNormalized);
@@ -109,13 +119,18 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
             public static Configuration MakeDefault() => new Configuration { TargetCamera = Camera.main, MouseSpeed = new Vector2(1, -1), AxisScale = new Vector2(0.12f, -0.12f), ScrollSpeed = 1f / 120f };
         }
 
-        public bool ShouldDrawCursor { get => CursorObject.gameObject.activeSelf; set => CursorObject.gameObject.SetActive(value); }
+        private void _updateCursorDrawability() => CursorObject.gameObject.SetActive(ShouldDrawCursor);
+
+        bool _shouldDrawCursor = true;
+        public bool ShouldDrawCursor { get => _shouldDrawCursor; set { _shouldDrawCursor = value; _updateCursorDrawability(); }  }
         internal Image CursorObject { get; set; }
         public Texture Cursor { get => CursorObject.mainTexture; set => CursorObject.material.mainTexture = value; }
         public Color CursorColor { get => CursorObject.color; set => CursorObject.color = value;}
 
         internal void UpdateState(Native.MouseInputFrame frame)
         {
+            if (!IsActive) return;
+
             ProcessMovement();
             ProcessScroll();
             ProcessKeys();
@@ -155,11 +170,6 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
                     var newCanvas = _inputManager._getCanvasForDisplay(cam.targetDisplay);
                     CursorObject.transform.SetParent(newCanvas.transform, false);
                 }
-
-                /*{
-                    var ray = WorldPositionRay;
-                    Debug.DrawRay(ray.origin - ray.direction * 2, ray.direction * 10, CursorColor);
-                }*/
 
                 CursorObject.rectTransform.position = ScreenPosition;
                 return;
