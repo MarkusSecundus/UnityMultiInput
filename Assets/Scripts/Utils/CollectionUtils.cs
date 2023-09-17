@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 public static class CollectionUtils
@@ -6,5 +7,16 @@ public static class CollectionUtils
     {
         for (int t = begin; t < end; t += increment)
             yield return t;
+    }
+
+    public static (T Value, int Index)? FirstIndexed<T>(this IEnumerable<T> self, Func<T, bool> predicate)
+    {
+        int t = 0;
+        foreach(var item in self)
+        {
+            if (predicate(item)) return (item, t);
+            ++t;
+        }
+        return null;
     }
 }
