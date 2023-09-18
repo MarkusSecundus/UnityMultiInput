@@ -6,8 +6,6 @@ using DisplayIdentifier = System.Int32;
 
 using MouseHandle = System.IntPtr;
 using UnityEngine.UI;
-using UnityEngine.Rendering;
-using System.Resources;
 using Unity.VisualScripting;
 
 #if PLATFORM_STANDALONE_WIN
