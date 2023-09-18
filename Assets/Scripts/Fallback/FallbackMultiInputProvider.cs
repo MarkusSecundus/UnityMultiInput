@@ -10,7 +10,10 @@ public class FallbackMultiInputProvider : IInputProvider
     public static FallbackMultiInputProvider Instance { get; } = new();
     public IReadOnlyCollection<IMouse> ActiveMice { get; } = new Mouse[] { Mouse.Instance };
 
+    public IReadOnlyCollection<IKeyboard> ActiveKeyboards => throw new NotImplementedException();
+
     public event Action<IMouse> OnMouseActivated;
+    public event Action<IKeyboard> OnKeyboardActivated;
 
     private class Mouse : IMouse
     {

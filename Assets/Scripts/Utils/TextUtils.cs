@@ -6,7 +6,7 @@ using UnityEngine;
 
 public static class TextUtils 
 {
-    public static string MakeString<T>(this IEnumerable<T> self, string separator = ", ", string format=null)
+    public static string MakeString<T>(this IEnumerable<T> self, string separator = ", ")
     {
         using var it = self.GetEnumerator();
         if (!it.MoveNext()) return "";
@@ -14,6 +14,6 @@ public static class TextUtils
         while (it.MoveNext()) ret.Append(separator).Append(doFormat(it.Current));
         return ret.ToString();
 
-        string doFormat(T item) => format == null ? item.ToString() : ((IFormattable)item).ToString(format, System.Globalization.CultureInfo.CurrentCulture);
+        string doFormat(T item) => item.ToString();
     }
 }

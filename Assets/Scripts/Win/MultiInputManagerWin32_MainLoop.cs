@@ -12,12 +12,14 @@ using TMPro;
 
 
 using MouseHandle = System.IntPtr;
+using KeyboardHandle = System.IntPtr;
 using InputHandle = System.IntPtr;
 using UnityEngine.UI;
 using System.Net;
 using static MultiInputManagerWin32;
 using System.Runtime.InteropServices.WindowsRuntime;
 using UnityEngine.EventSystems;
+using System.IO;
 
 #if PLATFORM_STANDALONE_WIN
 internal partial class MultiInputManagerWin32 : MonoBehaviour
@@ -51,8 +53,11 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
         EnsureIntegrity();
     }
 
-    public void Start() {
 
+    TextWriter wrt;
+    public void Start() 
+    {
+        wrt = new StreamWriter("input_test.txt");
         EnsureIntegrity();
         try
         {
@@ -84,8 +89,8 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
     {
         if (_inputReaderHandle != IntPtr.Zero)
         {
-            var arr = Native.GetActiveDevicesOfType(_inputReaderHandle, Native.RIM_DEVICETYPE.MOUSE).Consume();
-            foreach (var handle in arr)
+            var mice = NativeUtils.GetList<MouseHandle>(add=>Native.GetActiveDevicesOfType(_inputReaderHandle, Native.RIM_DEVICETYPE.MOUSE, add));
+            foreach (var handle in mice)
             {
                 try
                 {
@@ -97,6 +102,38 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
                     Debug.LogError($"{e.Message}\n{e.StackTrace}", this);
                 }
             }
+
+            var keyboards = NativeUtils.GetList<KeyboardHandle>(add => Native.GetActiveDevicesOfType(_inputReaderHandle, Native.RIM_DEVICETYPE.KEYBOARD, add));
+            foreach(var handle in keyboards)
+            {
+                try
+                {
+                    var events = NativeUtils.GetList<Native.KeypressDescriptor>(add => Native.ConsumeKeyboardState(_inputReaderHandle, handle, add));
+                    //if (events.Count > 0) Debug.Log(events.Select(e => $"{e.PressState}--{e.VirtualKeyCode}->{(KeyCode)e.VirtualKeyCode}").MakeString(separator:"\n"));
+
+                    if (events.Count > 1) Debug.Log($"Multiple events ({events.Count})...");
+                    foreach(var ev in events)
+                    {
+                        if (ev.PressState == Native.KeypressDescriptor.State.PRESS_UP) continue;
+                        var vkey = ev.VirtualKeyCode;
+                        var supposedCode = Native.VirtualScanCodeToManagedKeyCode(vkey);
+                        bool didFind = false;
+                        foreach (var c in Enum.GetValues(typeof(KeyCode)).Cast<KeyCode>())
+                            if (Input.GetKey(c))
+                            {
+                                Debug.Log($"0x{vkey:X} => {c}({supposedCode})      <{ev.ScanCode}>");
+                                if (c != supposedCode)
+                                    wrt.WriteLine($"0x{vkey:X} => {nameof(KeyCode)}.{c},");
+                                didFind = true;
+                            }
+                        if (!didFind) Debug.Log($"No keypress found for native {vkey}!");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"{e.Message}\n{e.StackTrace}", this);
+                }
+            }
         }
     }
 
@@ -104,6 +141,7 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
 
     public void OnDestroy()
     {
+        wrt.Dispose();
         if (!IntegrityIsOK() || _inputReaderHandle == IntPtr.Zero)
         {
             Debug.Log($"Destroying self while bad integrity: {name} (env:{_inputReaderHandle})", this);

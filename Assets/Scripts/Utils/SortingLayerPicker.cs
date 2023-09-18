@@ -3,6 +3,8 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
+#if UNITY_EDITOR
+
 /// <summary>
 /// Copied from <see href="https://discussions.unity.com/t/editor-script-for-setting-the-sorting-layer-of-an-object/101685/2"/>.
 /// <para>
@@ -55,3 +57,4 @@ public class SortingLayerAttribute : PropertyAttribute
     }
     
 }
+#endif

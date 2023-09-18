@@ -7,7 +7,10 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour, IInputProvider
 {
     public IReadOnlyCollection<IMouse> ActiveMice => _activeMice.Values;
 
+    public IReadOnlyCollection<IKeyboard> ActiveKeyboards => throw new NotImplementedException();
+
     public event Action<IMouse> OnMouseActivated;
+    public event Action<IKeyboard> OnKeyboardActivated;
 
     public static MultiInputManagerWin32 GetInstance()
     {

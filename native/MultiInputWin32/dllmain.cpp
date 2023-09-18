@@ -10,12 +10,23 @@
 #include"framework.h"
 
 static volatile HMODULE MainHModule;
+using VirtualKeyCode = int32_t;
 
 
 struct keyboard_state_internal_t {
-    using VirtualKeyCode = USHORT;
 
-    std::unordered_set<VirtualKeyCode> pressed_down, pressed_up;
+    std::unordered_map<VirtualKeyCode, keypress_descriptor_t> pressed_down, pressed_up;
+
+    void consume_all_events(Consumer<keypress_descriptor_t> pushback) {
+        for (const auto& ev : pressed_down)
+            pushback(ev.second);
+        for (const auto& ev : pressed_up) {
+            //pressed_down.erase(ev.first);
+            pushback(ev.second);
+        }
+        pressed_down.clear();
+        pressed_up.clear();
+    }
 };
 
 class input_tracker_t {
@@ -25,11 +36,18 @@ public:
     mouse_state_t* find_mouse(MouseHandle h) {
         return &(mice[h]);
     }
+    keyboard_state_internal_t* find_keyboard(KeyboardHandle h) {
+        return &(keyboards[h]);
+    }
     mutex_lock lock() { return mutex_lock(&mut); }
 
     void get_active_mice(Consumer<MouseHandle> pushback) {
         for (const auto& m : mice)
             pushback(m.first);
+    }
+    void get_active_keyboards(Consumer<KeyboardHandle> pushback) {
+        for (const auto& k : keyboards)
+            pushback(k.first);
     }
     const HWND window_handle;
 
@@ -37,10 +55,18 @@ private:
     std::mutex mut;
 
     std::unordered_map<MouseHandle, mouse_state_t> mice;
+    std::unordered_map<KeyboardHandle, keyboard_state_internal_t> keyboards;
 };
 
 
-
+static VirtualKeyCode read_virtual_key(const RAWKEYBOARD& rk) {
+    VirtualKeyCode ret = rk.VKey;
+    if (rk.Flags & RI_KEY_E0)
+        ret |= 0xE000;
+    else if (rk.Flags & RI_KEY_E1)
+        ret |= 0xE100;
+    return ret;
+}
 
 void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) {
     auto tracker = (input_tracker_t*)GetWindowLongPtr(hwnd, 0);
@@ -64,7 +90,8 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
 
     if (raw->header.dwType == RIM_TYPEKEYBOARD)
     {
-        DEBUGLOG("Kbd({6}): make={0} Flags:{1} Reserved:{2} ExtraInformation:{3}, msg={4} VK={5} \n",
+        const auto& rk(raw->data.keyboard);
+        /*DEBUGLOG("Kbd({6}): make={0} Flags:{1} Reserved:{2} ExtraInformation:{3}, msg={4} VK={5} \n",
             ii(raw->data.keyboard.MakeCode),
             ii(raw->data.keyboard.Flags),
             ii(raw->data.keyboard.Reserved),
@@ -72,8 +99,25 @@ void handle_raw_input_message(HWND hwnd, UINT inputCode, HRAWINPUT inputHandle) 
             ii(raw->data.keyboard.Message),
             ii(raw->data.keyboard.VKey),
             pp(raw->header.hDevice)
-        );
+        );*/
+        
+        {
+            VirtualKeyCode virtualCode = read_virtual_key(rk);
 
+            auto _ = tracker->lock();
+
+            auto k = tracker->find_keyboard(raw->header.hDevice);
+
+            keypress_descriptor_t* d;
+            if (rk.Flags & RI_KEY_BREAK) //pressed-up event
+                (d = &(k->pressed_up[virtualCode]))->press_state = keypress_descriptor_t::state_t::PRESS_UP;
+            else                         //pressed-down event
+                (d = &(k->pressed_down[virtualCode]))->press_state = keypress_descriptor_t::state_t::PRESS_DOWN;
+            d->virtual_key_code = virtualCode;
+            d->scan_code = rk.MakeCode;
+            //TODO: implement reading the corresponding character
+            d->text_value = 0;
+        }
     }
     else if (raw->header.dwType == RIM_TYPEMOUSE)
     {
@@ -293,6 +337,8 @@ extern "C" {
     }
 
 
+
+
     mouse_state_t DLL_EXPORT ConsumeMouseState(input_tracker_t* tracker, MouseHandle mouse) {
         auto _ = tracker->lock();
 
@@ -309,7 +355,7 @@ extern "C" {
         if (deviceType == RIM_TYPEMOUSE)
             tracker->get_active_mice(listPushback);
         else if (deviceType == RIM_TYPEKEYBOARD)
-            ;
+            tracker->get_active_keyboards(listPushback);
     }
 
 
@@ -328,6 +374,18 @@ extern "C" {
         DEBUGLOG("Mouse info({2}): {0}'{1}'", pp(name), ss(name), ii(out->id));
 
         return TRUE;
+    }
+
+
+
+
+
+
+    void DLL_EXPORT ConsumeKeyboardState(input_tracker_t* tracker, KeyboardHandle keyboard, Consumer<keypress_descriptor_t> listPushback) {
+        auto _ = tracker->lock();
+
+        auto state = tracker->find_keyboard(keyboard);
+        state->consume_all_events(listPushback);
     }
 }
 

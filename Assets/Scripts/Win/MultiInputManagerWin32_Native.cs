@@ -12,6 +12,7 @@ using TMPro;
 
 
 using MouseHandle = System.IntPtr;
+using KeyboardHandle = System.IntPtr;
 using InputHandle = System.IntPtr;
 using UnityEngine.UI;
 using System.Net;
@@ -21,7 +22,7 @@ using System.Net;
 
 internal partial class MultiInputManagerWin32 : MonoBehaviour
 {
-    internal static class Native
+    internal static partial class Native
     {
         public const string DllPath = NativeUtils.MainDllPath;
         [DllImport(DllPath)]
@@ -36,11 +37,13 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
         [DllImport(DllPath)]
         public static extern MouseInputFrame ConsumeMouseState(InputHandle tracker, MouseHandle mouseHandle);
 
+        [DllImport(DllPath)]
+        public static extern void ConsumeKeyboardState(InputHandle tracker, KeyboardHandle keyboard, NativeConsumer<KeypressDescriptor> listPushback);
 
         [DllImport(DllPath)]
-        public static extern NativeArray<MouseHandle> GetAvailableDevicesOfType(InputHandle tracker, RIM_DEVICETYPE deviceType);
+        public static extern void GetAvailableDevicesOfType(InputHandle tracker, RIM_DEVICETYPE deviceType, NativeConsumer<MouseHandle> listPushback);
         [DllImport(DllPath)]
-        public static extern NativeArray<MouseHandle> GetActiveDevicesOfType(InputHandle tracker, RIM_DEVICETYPE deviceType);
+        public static extern void GetActiveDevicesOfType(InputHandle tracker, RIM_DEVICETYPE deviceType, NativeConsumer<MouseHandle> listPushback);
         [DllImport(DllPath)]
         public static extern int GetMouseInfo(MouseHandle mouse, out MouseInfo info);
 
@@ -99,6 +102,19 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
             public bool HasHorizontalWheel;
             IntPtr name_;
             public override string ToString() => $"<{Id})..{NumberOfButtons}b..{SampleRate}hz..{HasHorizontalWheel}>'{name_}'";
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct KeypressDescriptor
+        {
+            public int ScanCode;
+            public int VirtualKeyCode;
+            public int TextValue;
+            public State PressState;
+            public enum State: byte
+            {
+                PRESS_DOWN=0, PRESS_UP=1
+            }
         }
     }
 }

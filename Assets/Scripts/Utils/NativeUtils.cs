@@ -9,6 +9,13 @@ namespace MarkusSecundus.Utils.Native
     public static class NativeUtils
     {
         public const string MainDllPath = "MultiInputWin32.dll";
+
+        public static List<T> GetList<T>(Action<NativeConsumer<T>> dataSource)
+        {
+            var ret = new List<T>();
+            dataSource(ret.Add);
+            return ret;
+        }
     }
 
 
@@ -45,6 +52,10 @@ namespace MarkusSecundus.Utils.Native
         }
     }
 
+
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    public delegate void NativeConsumer<T>(T arg);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     public delegate void NativeAction();
@@ -89,7 +100,7 @@ namespace MarkusSecundus.Utils.Native
                  {
                      try
                      {
-                         Debug.Log("native: " + string.Format(formatString, args.ToArray()));
+                         Debug.Log($"({DateTime.Now.TimeOfDay.TotalMinutes})native: " + string.Format(formatString, args.ToArray()));
                      }
                      catch
                      {
