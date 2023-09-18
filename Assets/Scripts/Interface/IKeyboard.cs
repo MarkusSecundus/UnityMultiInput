@@ -4,6 +4,7 @@ using UnityEngine;
 
 public interface IKeyboard
 {
+    public int Id { get; }
     public bool IsActive { get; set; }
 
     public bool GetButton(KeyCode buttonNumber);
@@ -12,6 +13,10 @@ public interface IKeyboard
     public bool IsAnyButtonDown { get; }
     public bool IsAnyButtonUp { get; }
     public bool IsAnyButtonPressed { get; }
+
+    public IReadOnlyCollection<KeyCode> ButtonsDown { get; }
+    public IReadOnlyCollection<KeyCode> ButtonsUp { get; }
+    public IReadOnlyCollection<KeyCode> ButtonsPressed { get; }
 
     public IConfiguration Config { get; }
 

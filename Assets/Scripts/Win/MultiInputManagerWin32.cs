@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 
 #if PLATFORM_STANDALONE_WIN
+
+[DefaultExecutionOrder(-500)]
 internal partial class MultiInputManagerWin32 : MonoBehaviour, IInputProvider
 {
     public IReadOnlyCollection<IMouse> ActiveMice => _activeMice.Values;
 
-    public IReadOnlyCollection<IKeyboard> ActiveKeyboards => throw new NotImplementedException();
+    public IReadOnlyCollection<IKeyboard> ActiveKeyboards => _activeKeyboards.Values;
 
     public event Action<IMouse> OnMouseActivated;
     public event Action<IKeyboard> OnKeyboardActivated;

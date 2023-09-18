@@ -108,26 +108,9 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
             {
                 try
                 {
-                    var events = NativeUtils.GetList<Native.KeypressDescriptor>(add => Native.ConsumeKeyboardState(_inputReaderHandle, handle, add));
-                    //if (events.Count > 0) Debug.Log(events.Select(e => $"{e.PressState}--{e.VirtualKeyCode}->{(KeyCode)e.VirtualKeyCode}").MakeString(separator:"\n"));
-
-                    if (events.Count > 1) Debug.Log($"Multiple events ({events.Count})...");
-                    foreach(var ev in events)
-                    {
-                        if (ev.PressState == Native.KeypressDescriptor.State.PRESS_UP) continue;
-                        var vkey = ev.VirtualKeyCode;
-                        var supposedCode = Native.VirtualScanCodeToManagedKeyCode(vkey);
-                        bool didFind = false;
-                        foreach (var c in Enum.GetValues(typeof(KeyCode)).Cast<KeyCode>())
-                            if (Input.GetKey(c))
-                            {
-                                Debug.Log($"0x{vkey:X} => {c}({supposedCode})      <{ev.ScanCode}>");
-                                if (c != supposedCode)
-                                    wrt.WriteLine($"0x{vkey:X} => {nameof(KeyCode)}.{c},");
-                                didFind = true;
-                            }
-                        if (!didFind) Debug.Log($"No keypress found for native {vkey}!");
-                    }
+                    __keyboardTest(handle);
+                    //var events = NativeUtils.GetList<Native.KeypressDescriptor>(add => Native.ConsumeKeyboardState(_inputReaderHandle, handle, add));
+                    //_getOrCreateKeyboard(handle).UpdateState(events);
                 }
                 catch (Exception e)
                 {
@@ -137,6 +120,28 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
         }
     }
 
+    private void __keyboardTest(KeyboardHandle handle)
+    {
+        var events = NativeUtils.GetList<Native.KeypressDescriptor>(add => Native.ConsumeKeyboardState(_inputReaderHandle, handle, add));
+
+        if (events.Count > 1) Debug.Log($"Multiple events ({events.Count})...");
+        foreach (var ev in events)
+        {
+            if (ev.PressState == Native.KeypressDescriptor.State.PRESS_UP) continue;
+            var (vkey, scan) = (ev.VirtualKeyCode, ev.ScanCode);
+            var supposedCode = Native.NativeVirtualKeyCodeToManagedKeyCode(vkey, scan);
+            bool didFind = false;
+            foreach (var c in Enum.GetValues(typeof(KeyCode)).Cast<KeyCode>())
+                if (Input.GetKey(c))
+                {
+                    Debug.Log($"0x{vkey:X} => {c}({supposedCode})      <{ev.ScanCode}>");
+                    if (c != supposedCode)
+                        wrt.WriteLine($"0x{vkey:X} => {nameof(KeyCode)}.{c},");
+                    didFind = true;
+                }
+            if (!didFind) Debug.Log($"No keypress found for native {vkey}!");
+        }
+    }
 
 
     public void OnDestroy()
