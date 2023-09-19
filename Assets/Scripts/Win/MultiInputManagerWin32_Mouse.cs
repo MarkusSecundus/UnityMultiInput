@@ -57,7 +57,7 @@ internal partial class MultiInputManagerWin32 : MonoBehaviour
     Image _createMouseCursor(Camera cam, int cursorId, Texture texture, Color color)
     {
         var canvas = _getCanvasForDisplay(cam.targetDisplay);
-        var cursor = Resources.Load(ResourcePaths.CursorPrefab).GetComponent<Image>();
+        var cursor = Resources.Load<Image>(ResourcePaths.CursorPrefab);
         cursor = GameObject.Instantiate(cursor);
         cursor.rectTransform.SetParent(canvas.transform, false);
         cursor.rectTransform.localPosition = Vector3.zero;
