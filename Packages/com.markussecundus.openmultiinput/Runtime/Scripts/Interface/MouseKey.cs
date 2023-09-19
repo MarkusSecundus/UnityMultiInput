@@ -9,6 +9,7 @@ namespace MarkusSecundus.MultiInput
 {
     public enum MouseKeyCode
     {
+        None = KeyCode.None,
         LeftButton = KeyCode.Mouse0,
         RightButton = KeyCode.Mouse1,
         MiddleButton = KeyCode.Mouse2,
@@ -26,5 +27,6 @@ namespace MarkusSecundus.MultiInput
 
         public static int AsMouseKeyIndex(this MouseKeyCode code) => (int)code - (int)MouseKeyCode.LeftButton;
         public static KeyCode AsKeyCode(this MouseKeyCode code) => (KeyCode)(int)code;
+        public static MouseKeyCode AsMouseKeyCode(this KeyCode code) => ((MouseKeyCode)code >= MouseKeyCode.LeftButton && (MouseKeyCode)code <= MouseKeyCode.Button4)? (MouseKeyCode)(int)code : MouseKeyCode.None;
     }
 }

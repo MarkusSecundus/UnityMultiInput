@@ -6,7 +6,6 @@ using DisplayIdentifier = System.Int32;
 
 using MouseHandle = System.IntPtr;
 using UnityEngine.UI;
-using Unity.VisualScripting;
 using MarkusSecundus.Utils;
 
 namespace MarkusSecundus.MultiInput.Windows

@@ -43,6 +43,12 @@ namespace MarkusSecundus.MultiInput.Fallback
             public Texture Cursor { get => throw new NotImplementedException(); set => UnityEngine.Cursor.SetCursor((Texture2D)value, Vector2.zero, CursorMode.Auto); }
             public Color CursorColor { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
+            public Vector2 ViewportPositionNormalized => throw new NotImplementedException();
+
+            public Vector2 ScreenPosition => throw new NotImplementedException();
+
+            public Ray WorldPositionRay => throw new NotImplementedException();
+
             private class Configuration : IMouse.IConfiguration
             {
                 public Camera TargetCamera { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }

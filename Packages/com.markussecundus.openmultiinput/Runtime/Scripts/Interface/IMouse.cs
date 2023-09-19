@@ -1,3 +1,4 @@
+using MarkusSecundus.Utils;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -9,6 +10,9 @@ namespace MarkusSecundus.MultiInput
         public bool IsActive { get; set; }
         public Vector2 ViewportPosition { get; }
         public Vector2 ScrollDelta { get; }
+        public Vector2 ViewportPositionNormalized { get; }
+        public Vector2 ScreenPosition { get; }
+        public Ray WorldPositionRay { get; }
 
         public Vector2 Axes { get; }
         public Vector2 AxesRaw { get; }

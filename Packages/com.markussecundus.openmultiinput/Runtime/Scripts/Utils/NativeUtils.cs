@@ -8,9 +8,20 @@ namespace MarkusSecundus.Utils.Native
 {
     internal static class NativeUtils
     {
-        const string BasePackagePath = "Packages/com.markussecundus.openmultiinput/";
+        const string BasePackagePath =
 
-        public const string MainDllPath = BasePackagePath + "Runtime/dlls/MultiInputWin32.dll";
+#if UNITY_EDITOR
+            "Packages/com.markussecundus.openmultiinput/"
+#else
+            ""
+#endif
+            ;
+
+        public const string MainDllPath =
+#if UNITY_EDITOR
+            BasePackagePath + "Runtime/dlls/" +
+            #endif
+            "MultiInputWin32.dll";
 
         public static List<T> GetList<T>(Action<NativeConsumer<T>> dataSource)
         {
