@@ -1,0 +1,21 @@
+{
+  "name": "com.markussecundus.openmultiinput",
+  "version": "0.1.0",
+  "displayName": "Open MultiInput",
+  "description": "Library for accessing keyboards and mice connected to the computer as separate entities. Currently Windows only",
+  "documentationUrl": "https://github.com/MarkusSecundus/UnityMultiInput",
+  "licensesUrl": "https://raw.githubusercontent.com/MarkusSecundus/UnityMultiInput/main/LICENSE",
+  "keywords": [
+    "keyboard",
+    "mouse",
+    "input",
+    "hot-seat",
+    "multiplayer",
+    "local multiplayer"
+  ],
+  "author": {
+    "name": "MarkusSecundus",
+    "email": "unity@example.com",
+    "url": "https://github.com/MarkusSecundus/"
+  }
+}
