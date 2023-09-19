@@ -1,10 +1,13 @@
 using System.IO;
 
-internal partial class MultiInputManagerWin32
+namespace MarkusSecundus.MultiInput.Windows
 {
-    private static class ResourcePaths
+    internal partial class MultiInputManagerWin32
     {
-        public static readonly string CursorPrefab = Path.Combine("OpenMultiInput","MultiMouseCursor");
-        public static readonly string ConfigWin32 = Path.Combine("OpenMultiInput","Config", "Win32");
+        private static class ResourcePaths
+        {
+            public const string CursorPrefab = "MultiMouseCursor";
+            public const string ConfigWin32 = "Config_Win32";
+        }
     }
 }

@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6ef7844172ce8cb4ebbcdf66f8b707dc, type: 3}
-  m_Name: Win32
+  m_Name: Config_Win32
   m_EditorClassIdentifier: 
   IsMultiInputEnabled: 1
   Mouse:
@@ -18,7 +18,7 @@ MonoBehaviour:
     MouseAxisSpeed: {x: 0.12, y: -0.12}
     MouseScrollSpeed: {x: 0.008333334, y: 0.008333334}
     CursorColors:
-    - {r: 1, g: 0, b: 0, a: 1}
+    - {r: 1, g: 0, b: 0.9173207, a: 1}
     - {r: 0.9150943, g: 0.51487005, b: 0.040287085, a: 1}
     - {r: 0.04509308, g: 0.7169812, b: 0.04509308, a: 1}
     - {r: 0, g: 0.60323477, b: 1, a: 1}
